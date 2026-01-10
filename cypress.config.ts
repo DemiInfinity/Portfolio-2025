@@ -15,16 +15,18 @@ export default defineConfig({
     defaultCommandTimeout: 10000,
     requestTimeout: 10000,
     responseTimeout: 10000,
-    setupNodeEvents(on, config) {
-      addCucumberPreprocessorPlugin(on, config)
+    async setupNodeEvents(on, config) {
+      // This adds the Cucumber preprocessor tasks
+      await addCucumberPreprocessorPlugin(on, config)
 
       on(
         'file:preprocessor',
         createBundler({
-          plugins: [createEsbuildPlugin(config)],
+          plugins: [createEsbuildPlugin(config) as any],
         })
       )
 
+      // Make sure to return the config with tasks registered
       return config
     },
   },

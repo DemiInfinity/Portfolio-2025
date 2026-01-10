@@ -10,10 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "types": ["cypress", "node"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["../packages/*/src/*"]
-    }
+    "baseUrl": "."
   },
   "include": [
     "**/*.ts",
