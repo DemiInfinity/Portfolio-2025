@@ -1,0 +1,205 @@
+{
+  "projects": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "title": "Test Project 1",
+        "description": "A test project for Cypress tests",
+        "technologies": ["React", "TypeScript", "Next.js"],
+        "github_url": "https://github.com/test/project1",
+        "live_url": "https://test-project1.com",
+        "image": null,
+        "date": "2024-01-15",
+        "created_at": "2024-01-15T00:00:00Z",
+        "updated_at": "2024-01-15T00:00:00Z",
+        "featured": true
+      },
+      {
+        "id": 2,
+        "title": "Test Project 2",
+        "description": "Another test project",
+        "technologies": ["Vue.js", "Node.js"],
+        "github_url": "https://github.com/test/project2",
+        "live_url": "https://test-project2.com",
+        "image": null,
+        "date": "2024-02-20",
+        "created_at": "2024-02-20T00:00:00Z",
+        "updated_at": "2024-02-20T00:00:00Z",
+        "featured": true
+      },
+      {
+        "id": 3,
+        "title": "Test Project 3",
+        "description": "Third test project",
+        "technologies": ["Python", "Django"],
+        "github_url": "https://github.com/test/project3",
+        "live_url": null,
+        "image": null,
+        "date": "2024-03-10",
+        "created_at": "2024-03-10T00:00:00Z",
+        "updated_at": "2024-03-10T00:00:00Z",
+        "featured": false
+      }
+    ]
+  },
+  "blogPosts": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "title": "Test Blog Post 1",
+        "slug": "test-blog-post-1",
+        "excerpt": "This is a test blog post excerpt",
+        "author": "Test Author",
+        "publish_date": "2024-01-15T00:00:00Z",
+        "created_at": "2024-01-15T00:00:00Z",
+        "read_time": 5,
+        "category": "Technology",
+        "tags": ["test", "cypress", "testing"],
+        "featured": true
+      },
+      {
+        "id": 2,
+        "title": "Test Blog Post 2",
+        "slug": "test-blog-post-2",
+        "excerpt": "Another test blog post",
+        "author": "Test Author",
+        "publish_date": "2024-02-20T00:00:00Z",
+        "created_at": "2024-02-20T00:00:00Z",
+        "read_time": 3,
+        "category": "Development",
+        "tags": ["javascript", "react"],
+        "featured": false
+      },
+      {
+        "id": 3,
+        "title": "Test Blog Post 3",
+        "slug": "test-blog-post-3",
+        "excerpt": "Third test blog post",
+        "author": "Test Author",
+        "publish_date": "2024-03-10T00:00:00Z",
+        "created_at": "2024-03-10T00:00:00Z",
+        "read_time": 7,
+        "category": "Technology",
+        "tags": ["typescript", "nextjs"],
+        "featured": true
+      }
+    ]
+  },
+  "blogPost": {
+    "success": true,
+    "data": {
+      "id": 1,
+      "title": "Test Blog Post 1",
+      "excerpt": "This is a test blog post excerpt",
+      "content": "Full content of the test blog post goes here. This is a longer piece of content to test the blog post display functionality in Cypress tests.",
+      "author": "Test Author",
+      "publish_date": "2024-01-15T00:00:00Z",
+      "created_at": "2024-01-15T00:00:00Z",
+      "read_time": 5,
+      "category": "Technology",
+      "tags": ["test", "cypress", "testing"],
+      "featured": true,
+      "slug": "test-blog-post-1"
+    }
+  },
+  "learning": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "title": "Learning React Hooks",
+        "description": "Learning about React Hooks",
+        "progress": 50,
+        "category": "Frontend",
+        "start_date": "2024-01-01",
+        "estimated_completion": "2024-06-01",
+        "status": "in_progress",
+        "resources": ["Official React docs", "React Hooks tutorial"],
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-15T00:00:00Z"
+      }
+    ]
+  },
+  "skills": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "name": "TypeScript",
+        "description": "TypeScript programming language",
+        "category": "Programming Language",
+        "level": "Advanced",
+        "created_at": "2023-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "name": "React",
+        "description": "React library",
+        "category": "Framework",
+        "level": "Advanced",
+        "created_at": "2023-02-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      }
+    ]
+  },
+  "workHistory": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "company": "Test Company",
+        "position": "Software Engineer",
+        "location": "Remote",
+        "start_date": "2023-01-01",
+        "end_date": "2024-01-01",
+        "description": "Test work history description",
+        "achievements": ["Built scalable applications", "Led team of developers"],
+        "technologies": ["React", "Node.js", "TypeScript"],
+        "company_url": "https://test-company.com"
+      }
+    ]
+  },
+  "education": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "institution": "Test University",
+        "degree": "Bachelor of Science",
+        "field_of_study": "Computer Science",
+        "location": "Test City",
+        "start_date": "2018-09-01",
+        "end_date": "2022-06-01",
+        "gpa": "First Class",
+        "grade": "First Class",
+        "description": "Computer Science degree with focus on software engineering",
+        "achievements": ["Dean's List", "Graduated with honors", "course: Advanced Algorithms", "activities: Computer Science Club"]
+      }
+    ]
+  },
+  "certifications": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "name": "Test Certification",
+        "issuer": "Test Issuer",
+        "issue_date": "2023-01-15",
+        "expiry_date": null,
+        "credential_id": "TEST-12345",
+        "credential_url": "https://test-issuer.com/cert/test-12345",
+        "description": "Test certification description",
+        "skills": ["TypeScript", "React", "Node.js"]
+      }
+    ]
+  },
+  "featureFlags": {
+    "success": true,
+    "data": {
+      "maintenance": false
+    }
+  }
+}

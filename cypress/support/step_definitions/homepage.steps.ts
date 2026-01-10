@@ -1,7 +1,10 @@
 import { Given, When, Then } from '@badeball/cypress-cucumber-preprocessor'
 
 Given('I visit the homepage', () => {
+  // API mocks are set up globally in e2e.ts
   cy.visit('/')
+  // Wait for projects API to be called
+  cy.wait('@getProjects', { timeout: 10000 })
 })
 
 Then('I should see the main heading', () => {
@@ -24,18 +27,26 @@ When('I click on the {string} link', (linkText: string) => {
 
 Then('I should be redirected to the projects page', () => {
   cy.url().should('include', '/projects')
+  // Wait for projects API call
+  cy.wait('@getProjects', { timeout: 10000 })
 })
 
 Then('I should be redirected to the experience page', () => {
   cy.url().should('include', '/experience')
+  // Wait for work history, education, and certifications API calls
+  cy.wait(['@getWorkHistory', '@getEducation', '@getCertifications'], { timeout: 10000 })
 })
 
 Then('I should be redirected to the blog page', () => {
   cy.url().should('include', '/blog')
+  // Wait for blog posts API call
+  cy.wait('@getBlogPosts', { timeout: 10000 })
 })
 
 Then('I should be redirected to the learning page', () => {
   cy.url().should('include', '/learning')
+  // Wait for learning and skills API calls
+  cy.wait(['@getLearning', '@getSkills'], { timeout: 10000 })
 })
 
 Then('I should see at least one featured project', () => {
