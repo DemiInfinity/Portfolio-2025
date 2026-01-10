@@ -20,7 +20,7 @@ vi.mock('react-router-dom', () => ({
   },
   BrowserRouter: ({ children }: { children: any }) => {
     return React.createElement(React.Fragment, null, children)
-  }
+  },
 }))
 
 // Mock axios
@@ -30,7 +30,7 @@ vi.mock('../lib/api', () => ({
     post: vi.fn(),
     put: vi.fn(),
     delete: vi.fn(),
-  }
+  },
 }))
 
 // Mock environment variables
