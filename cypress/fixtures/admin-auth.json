@@ -1,0 +1,42 @@
+{
+  "_comment": "TEST-ONLY credentials and mock API responses for Cypress tests. Real admin credentials are NEVER used - all API calls are intercepted and mocked.",
+  "validCredentials": {
+    "email": "test-admin@example.com",
+    "password": "test-password-123"
+  },
+  "invalidCredentials": {
+    "email": "invalid@example.com",
+    "password": "wrongpassword"
+  },
+  "loginSuccess": {
+    "success": true,
+    "data": {
+      "user": {
+        "id": "test-user-id-123",
+        "email": "test-admin@example.com",
+        "name": "Test Admin",
+        "role": "admin"
+      },
+      "session": {
+        "access_token": "test-access-token-123",
+        "refresh_token": "test-refresh-token-123",
+        "expires_at": 9999999999
+      }
+    }
+  },
+  "loginFailure": {
+    "success": false,
+    "error": "Invalid login credentials"
+  },
+  "userData": {
+    "success": true,
+    "data": {
+      "user": {
+        "id": "test-user-id-123",
+        "email": "test-admin@example.com",
+        "name": "Test Admin",
+        "role": "admin"
+      }
+    }
+  }
+}

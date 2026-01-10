@@ -29,11 +29,39 @@ declare global {
 }
 
 Cypress.Commands.add('login', (email: string, password: string) => {
-  cy.visit('/admin')
-  cy.get('input[type="email"]').type(email)
-  cy.get('input[type="password"]').type(password)
-  cy.get('button[type="submit"]').click()
-  cy.url().should('include', '/admin/dashboard')
+  // Use test-only credentials for Cypress tests
+  const testEmail = 'test-admin@example.com'
+  const testPassword = 'test-password-123'
+  
+  // Intercept API calls with mock responses
+  cy.fixture('admin-auth').then((authData) => {
+    // Intercept login API
+    cy.intercept('POST', '**/api/auth/login', {
+      statusCode: 200,
+      body: authData.loginSuccess,
+    }).as('loginApi')
+    
+    // Intercept /auth/me endpoint (called after successful login)
+    cy.intercept('GET', '**/api/auth/me', {
+      statusCode: 200,
+      body: authData.userData,
+    }).as('getUserApi')
+    
+    const adminUrl = Cypress.env('ADMIN_URL') || 'http://localhost:3002'
+    cy.visit(adminUrl)
+    
+    // Use test credentials regardless of what was passed
+    cy.get('input[type="email"]').type(testEmail)
+    cy.get('input[type="password"]').type(testPassword)
+    cy.get('button[type="submit"]').click()
+    
+    // Wait for login API call to complete
+    cy.wait('@loginApi')
+    cy.wait('@getUserApi', { timeout: 5000 })
+    
+    // Verify redirect to dashboard
+    cy.url().should('include', 'dashboard')
+  })
 })
 
 Cypress.Commands.add('waitForAPI', (method: string, url: string, alias?: string) => {

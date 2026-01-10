@@ -1,0 +1,10 @@
+{
+  "stepDefinitions": [
+    "cypress/support/step_definitions/**/*.{js,mjs,ts,tsx}",
+    "cypress/e2e/**/*.{js,mjs,ts,tsx}"
+  ],
+  "messages": {
+    "enabled": true,
+    "output": "cypress/cucumber-messages.ndjson"
+  }
+}

@@ -75,6 +75,17 @@ jobs:
         run: |
           npx wait-on http://localhost:3000 http://localhost:5000 -t 60000
       
+      - name: Start admin panel
+        run: |
+          cd packages/admin
+          yarn build
+          yarn vite preview --port 3002 --host 0.0.0.0 &
+        continue-on-error: true
+      
+      - name: Wait for admin panel
+        run: npx wait-on http://localhost:3002 -t 30000 || true
+        continue-on-error: true
+      
       - name: Run Cypress tests
         uses: cypress-io/github-action@v6
         with:
@@ -83,6 +94,10 @@ jobs:
           wait-on-timeout: 120
         env:
           CYPRESS_baseUrl: http://localhost:3000
+          CYPRESS_ADMIN_URL: http://localhost:3002
+          # NOTE: Admin login tests use TEST-ONLY credentials and intercept API calls.
+          # Real admin credentials are NOT used - all API calls are mocked.
+          # These env vars are kept for documentation but are not actually used in tests.
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       
