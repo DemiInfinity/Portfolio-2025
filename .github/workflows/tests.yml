@@ -79,11 +79,31 @@ jobs:
         run: |
           cd packages/admin
           yarn build
-          yarn vite preview --port 3002 --host 0.0.0.0 &
+          # Start preview server in background
+          nohup npx vite preview --port 3002 --host 0.0.0.0 > /tmp/admin-preview.log 2>&1 &
+          echo $! > /tmp/admin-pid.txt
+          # Wait a bit for server to start
+          sleep 3
+          # Verify server started
+          for i in {1..10}; do
+            if curl -f http://localhost:3002 > /dev/null 2>&1; then
+              echo "✅ Admin panel started successfully on port 3002"
+              exit 0
+            fi
+            echo "Waiting for admin panel... attempt $i/10"
+            sleep 2
+          done
+          echo "⚠️ Admin panel may not be ready, but continuing..."
+          cat /tmp/admin-preview.log || true
         continue-on-error: true
       
-      - name: Wait for admin panel
-        run: npx wait-on http://localhost:3002 -t 30000 || true
+      - name: Verify admin panel
+        run: |
+          if curl -f http://localhost:3002 > /dev/null 2>&1; then
+            echo "✅ Admin panel is accessible"
+          else
+            echo "⚠️ Admin panel not accessible - admin tests may be skipped"
+          fi
         continue-on-error: true
       
       - name: Run Cypress tests
