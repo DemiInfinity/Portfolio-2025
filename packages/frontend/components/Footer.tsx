@@ -11,16 +11,11 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <img
-                src="/brand-logo.png"
-                alt=""
-                className="h-11 w-auto max-w-[180px] object-contain object-left opacity-90"
-              />
-              <h3 className="text-xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>
-                ✨ Demi Taylor Nimmo
-              </h3>
-            </div>
+            <img
+              src="/brand-logo.png"
+              alt=""
+              className="h-11 w-auto max-w-[180px] object-contain object-left opacity-90"
+            />
             <p className="text-gray-700 text-sm font-medium">
               Full Stack Software Engineer passionate about creating beautiful, innovative solutions
               and building exceptional user experiences. 💖
@@ -83,7 +78,7 @@ const Footer = () => {
         <div className="mt-8 pt-8 border-t border-pink-200">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-600 text-sm font-medium">
-              © {currentYear} Demi Taylor Nimmo. All rights reserved. ✨
+              © {currentYear}. All rights reserved. ✨
             </p>
             <p className="text-gray-600 text-sm flex items-center mt-2 md:mt-0 font-medium">
               Built with <Heart className="w-4 h-4 mx-1 text-pink-500" /> using Next.js & TypeScript 💖
