@@ -1,7 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
-import Logo from '@/assets/logo.svg'
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -52,7 +51,11 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col sidebar-girly pt-6">
           <div className="flex h-24 items-center justify-between px-6 mt-4">
             <div className="flex flex-col items-center justify-center flex-1">
-              <img src={Logo} alt="Portfolio Admin" className="h-24 w-24 mb-2" />
+              <img
+                src="/brand-logo.png"
+                alt="Demi Taylor Nimmo"
+                className="h-16 w-auto max-w-[200px] object-contain mb-2"
+              />
               <span className="text-sm font-bold gradient-text" style={{ fontFamily: 'Poppins, sans-serif' }}>
                 Admin Panel
               </span>
@@ -100,7 +103,11 @@ const Layout = ({ children }: LayoutProps) => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow sidebar-girly pt-8">
           <div className="flex flex-col items-center justify-center h-24 px-6 mt-4">
-            <img src={Logo} alt="Portfolio Admin" className="h-24 w-24 mb-2" />
+            <img
+              src="/brand-logo.png"
+              alt="Demi Taylor Nimmo"
+              className="h-16 w-auto max-w-[200px] object-contain mb-2"
+            />
             <span className="text-sm font-bold gradient-text" style={{ fontFamily: 'Poppins, sans-serif' }}>
               Admin Panel
             </span>

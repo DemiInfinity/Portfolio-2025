@@ -17,9 +17,12 @@ export const metadata: Metadata = {
   keywords: 'software engineer, full stack developer, web development, portfolio, creative developer',
   authors: [{ name: 'Demi Taylor Nimmo' }],
   icons: {
-    icon: '/favicon.svg',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/brand-logo.png', type: 'image/png' },
+    ],
     shortcut: '/favicon.ico',
-    apple: '/favicon.svg',
+    apple: { url: '/brand-logo.png', type: 'image/png' },
   },
   openGraph: {
     title: 'Demi Taylor Nimmo - Full Stack Software Engineer ✨',

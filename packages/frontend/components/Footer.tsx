@@ -11,9 +11,16 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>
-              ✨ Demi Taylor Nimmo
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <img
+                src="/brand-logo.png"
+                alt=""
+                className="h-11 w-auto max-w-[180px] object-contain object-left opacity-90"
+              />
+              <h3 className="text-xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>
+                ✨ Demi Taylor Nimmo
+              </h3>
+            </div>
             <p className="text-gray-700 text-sm font-medium">
               Full Stack Software Engineer passionate about creating beautiful, innovative solutions
               and building exceptional user experiences. 💖

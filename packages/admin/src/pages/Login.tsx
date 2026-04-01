@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '@/hooks/useAuth'
 import { Eye, EyeOff } from 'lucide-react'
-import Logo from '@/assets/logo.svg'
 import toast from 'react-hot-toast'
 
 interface LoginForm {
@@ -42,11 +41,11 @@ const Login = () => {
       
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="card text-center p-8">
-          <div className="mx-auto h-24 w-24 mb-4">
-            <img 
-              src={Logo} 
-              alt="Admin Logo" 
-              className="h-full w-full object-contain"
+          <div className="mx-auto mb-4 flex justify-center">
+            <img
+              src="/brand-logo.png"
+              alt="Demi Taylor Nimmo"
+              className="h-20 sm:h-24 w-auto max-w-[220px] object-contain"
             />
           </div>
           <h2 className="mt-6 text-center text-4xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>

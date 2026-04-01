@@ -22,10 +22,14 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 flex items-center gap-3">
-              <img src="/logo.svg" alt="Portfolio" className="h-12 w-12" />
-              <span className="text-2xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>
-                DTN
+            <Link href="/" className="flex-shrink-0 flex items-center gap-2 sm:gap-3">
+              <img
+                src="/brand-logo.png"
+                alt="Demi Taylor Nimmo"
+                className="h-9 sm:h-11 w-auto max-w-[140px] sm:max-w-[180px] object-contain object-left"
+              />
+              <span className="text-xl sm:text-2xl font-bold gradient-text whitespace-nowrap hidden sm:inline" style={{ fontFamily: 'Dancing Script, cursive' }}>
+                Demi Taylor Nimmo
               </span>
             </Link>
           </div>
