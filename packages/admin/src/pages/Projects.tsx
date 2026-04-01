@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, ExternalLink, Github } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ImageUploadButton } from '@/components/ImageUploadButton'
 
 interface Project {
   id: number
@@ -62,7 +63,7 @@ const Projects = () => {
     })
   })
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProjectForm>()
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectForm>()
 
   const createMutation = useMutation(
     (data: ProjectForm) => api.post('/projects', {
@@ -199,8 +200,12 @@ const Projects = () => {
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {projects?.map((project) => (
           <div key={project.id} className="card p-6 hover:scale-105 transition-all duration-300">
-            <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100 rounded-xl mb-4 flex items-center justify-center">
-              <span className="text-4xl opacity-50">🎨</span>
+            <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
+              {project.image ? (
+                <img src={project.image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-4xl opacity-50">🎨</span>
+              )}
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -282,7 +287,7 @@ const Projects = () => {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="modal-overlay fixed inset-0" onClick={closeModal}></div>
-            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full">
               <form onSubmit={handleSubmit(onSubmit)}>
                 <div className="modal-header">
                   <h3 className="text-xl font-bold">
@@ -310,6 +315,22 @@ const Projects = () => {
                         placeholder="Tell us about this beautiful project..."
                       />
                       {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">🖼️ Project image URL</label>
+                      <p className="text-sm text-gray-500 mb-2">Card thumbnail on the portfolio site.</p>
+                      <input
+                        {...register('image')}
+                        type="url"
+                        className="form-input"
+                        placeholder="https://… or upload below"
+                      />
+                      <div className="mt-2">
+                        <ImageUploadButton
+                          label="Upload image"
+                          onUploaded={(url) => setValue('image', url)}
+                        />
+                      </div>
                     </div>
                     <div className="form-group">
                       <label className="form-label">🛠️ Technologies (comma-separated)</label>

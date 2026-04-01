@@ -4,7 +4,12 @@
 -- Add missing columns to blog_posts table
 ALTER TABLE blog_posts 
 ADD COLUMN IF NOT EXISTS author VARCHAR(255) DEFAULT 'Demi Taylor Nimmo',
-ADD COLUMN IF NOT EXISTS read_time INTEGER DEFAULT 5;
+ADD COLUMN IF NOT EXISTS read_time INTEGER DEFAULT 5,
+ADD COLUMN IF NOT EXISTS cover_image TEXT;
+
+-- Project card / thumbnail image (full URL, e.g. Supabase Storage public URL)
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS image TEXT;
 
 -- Add missing columns to analytics table  
 ALTER TABLE analytics
@@ -63,5 +68,5 @@ WHERE author IS NULL OR read_time IS NULL;
 -- Verify columns were added
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns 
-WHERE table_name IN ('blog_posts', 'analytics', 'education', 'certifications', 'learning', 'feature_flags')
+WHERE table_name IN ('blog_posts', 'projects', 'analytics', 'education', 'certifications', 'learning', 'feature_flags')
 ORDER BY table_name, ordinal_position;

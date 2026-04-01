@@ -32,7 +32,7 @@ import certificationsRoutes from './routes/certifications'
 import analyticsRoutes from './routes/analytics'
 import featureFlagsRoutes from './routes/featureFlags'
 import keepAliveRoutes from './routes/keepalive'
-// import uploadRoutes from './routes/upload'
+import uploadRoutes from './routes/upload'
 
 // Load environment variables
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development'
@@ -130,7 +130,7 @@ app.use('/api/certifications', certificationsRoutes)
 app.use('/api/analytics', analyticsRoutes)
 app.use('/api/feature-flags', featureFlagsRoutes)
 app.use('/api/keepalive', keepAliveRoutes)
-// app.use('/api/upload', uploadRoutes)
+app.use('/api/upload', uploadRoutes)
 
 // Error handling
 app.use(notFound)

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Code, Database, Globe, Smartphone } from 'lucide-react'
 import Link from 'next/link'
 import { fetchProjects } from '@/lib/api'
+import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface Project {
   id: number
@@ -196,7 +197,15 @@ export default function Home() {
                   viewport={{ once: true }}
                   className="project-card"
                 >
-                  <div className="h-48 bg-gradient-to-br from-pink-200 to-purple-200"></div>
+                  <div className="relative h-48 bg-gradient-to-br from-pink-200 to-purple-200 overflow-hidden">
+                    {project.image && resolveMediaUrl(project.image) ? (
+                      <img
+                        src={resolveMediaUrl(project.image)}
+                        alt={project.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : null}
+                  </div>
                   <div className="p-6">
                     <h3 className="text-xl font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
                       {project.title}

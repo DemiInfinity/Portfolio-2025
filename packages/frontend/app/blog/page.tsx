@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Calendar, Clock, Tag, ArrowRight, Search } from 'lucide-react'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface BlogPost {
   id: number
@@ -17,6 +18,7 @@ interface BlogPost {
   tags: string[]
   featured: boolean
   slug: string
+  coverImage?: string | null
 }
 
 export default function Blog() {
@@ -48,7 +50,8 @@ export default function Blog() {
             category: post.category,
             tags: Array.isArray(post.tags) ? post.tags : [],
             featured: post.featured,
-            slug: post.slug
+            slug: post.slug,
+            coverImage: post.cover_image ?? null
           }))
           setBlogPosts(mappedPosts)
         }
@@ -185,7 +188,15 @@ export default function Blog() {
                   viewport={{ once: true }}
                   className="card shadow-lg hover:shadow-xl hover:scale-105 transition-all overflow-hidden"
                 >
-                  <div className="h-48 bg-gradient-to-br from-pink-200 to-purple-300"></div>
+                  <div className="relative h-48 bg-gradient-to-br from-pink-200 to-purple-300 overflow-hidden">
+                    {post.coverImage && resolveMediaUrl(post.coverImage) ? (
+                      <img
+                        src={resolveMediaUrl(post.coverImage)}
+                        alt={post.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : null}
+                  </div>
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getCategoryColor(post.category)}`}>
@@ -260,7 +271,15 @@ export default function Blog() {
                   viewport={{ once: true }}
                   className="card shadow-md hover:shadow-lg hover:scale-105 transition-all overflow-hidden"
                 >
-                  <div className="h-40 bg-gradient-to-br from-pink-100 to-purple-200"></div>
+                  <div className="relative h-40 bg-gradient-to-br from-pink-100 to-purple-200 overflow-hidden">
+                    {post.coverImage && resolveMediaUrl(post.coverImage) ? (
+                      <img
+                        src={resolveMediaUrl(post.coverImage)}
+                        alt={post.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : null}
+                  </div>
                   <div className="p-5">
                     <div className="flex items-center justify-between mb-3">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getCategoryColor(post.category)}`}>

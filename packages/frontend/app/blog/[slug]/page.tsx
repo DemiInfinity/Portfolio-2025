@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import BlogPostClient from './BlogPostClient'
+import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface PageProps {
   params: {
@@ -45,6 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${post.title} | Demi Taylor Nimmo`
   const description = post.excerpt || 'Read this blog post by Demi Taylor Nimmo'
   const author = post.author || 'Demi Taylor Nimmo'
+  const ogImage = post.cover_image ? resolveMediaUrl(post.cover_image) : undefined
 
   return {
     title,
@@ -60,12 +62,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       publishedTime: post.publish_date || post.created_at,
       authors: [author],
       tags: post.tags ? (Array.isArray(post.tags) ? post.tags : JSON.parse(post.tags || '[]')) : [],
+      ...(ogImage ? { images: [{ url: ogImage, alt: post.title }] } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
       creator: '@demitaylornimmo',
+      ...(ogImage ? { images: [ogImage] } : {}),
     },
     alternates: {
       canonical: url,

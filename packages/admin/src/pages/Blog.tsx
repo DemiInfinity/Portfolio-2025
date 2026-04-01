@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { ImageUploadButton } from '@/components/ImageUploadButton'
 
 interface BlogPost {
   id: number
@@ -18,6 +19,7 @@ interface BlogPost {
   tags: string[]
   featured: boolean
   published: boolean
+  cover_image?: string | null
 }
 
 interface BlogForm {
@@ -32,6 +34,7 @@ interface BlogForm {
   tags: string
   featured: boolean
   published: boolean
+  cover_image: string
 }
 
 const Blog = () => {
@@ -44,7 +47,7 @@ const Blog = () => {
     return response.data.data as BlogPost[]
   })
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<BlogForm>()
+  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<BlogForm>()
 
   const createMutation = useMutation(
     (data: BlogForm) => api.post('/blog', {
@@ -133,7 +136,8 @@ const Blog = () => {
         category: post.category || '',
         tags: Array.isArray(post.tags) ? post.tags.join(', ') : '',
         featured: post.featured || false,
-        published: post.published || false
+        published: post.published || false,
+        cover_image: post.cover_image || ''
       })
     } else {
       setEditingPost(null)
@@ -148,7 +152,8 @@ const Blog = () => {
         category: '',
         tags: '',
         featured: false,
-        published: false
+        published: false,
+        cover_image: ''
       })
     }
     setIsModalOpen(true)
@@ -332,7 +337,26 @@ const Blog = () => {
                       {errors.excerpt && <p className="text-red-500 text-sm mt-1">{errors.excerpt.message}</p>}
                     </div>
                     <div className="form-group">
+                      <label className="form-label">🖼️ Cover image URL (optional)</label>
+                      <p className="text-sm text-gray-500 mb-2">Shown at the top of the post and in social previews.</p>
+                      <input
+                        {...register('cover_image')}
+                        type="url"
+                        className="form-input"
+                        placeholder="https://… or upload below"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <ImageUploadButton
+                          label="Upload → set cover"
+                          onUploaded={(url) => setValue('cover_image', url)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group">
                       <label className="form-label">✍️ Content</label>
+                      <p className="text-sm text-gray-500 mb-2">
+                        Markdown supported. Inline images: <code className="bg-pink-50 px-1 rounded">![description](image URL)</code>
+                      </p>
                       <textarea
                         {...register('content', { required: 'Content is required' })}
                         rows={15}
@@ -340,6 +364,15 @@ const Blog = () => {
                         placeholder="Write your amazing blog post content here... (Markdown supported) ✨"
                       />
                       {errors.content && <p className="text-red-500 text-sm mt-1">{errors.content.message}</p>}
+                      <div className="mt-2">
+                        <ImageUploadButton
+                          label="Upload → insert image in content"
+                          onUploaded={(url) => {
+                            const cur = getValues('content') || ''
+                            setValue('content', `${cur}\n\n![](${url})\n`)
+                          }}
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
                       <div className="form-group">

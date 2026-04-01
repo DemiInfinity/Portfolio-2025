@@ -15,7 +15,7 @@ router.get('/', async (req: Request, res: Response) => {
     
     let query = supabaseService.getClient()
       .from('blog_posts')
-      .select('id, title, slug, excerpt, created_at, category, tags, featured, author, read_time')
+      .select('id, title, slug, excerpt, created_at, category, tags, featured, author, read_time, cover_image')
       .eq('published', true)
 
     // Add category filter
@@ -79,7 +79,7 @@ router.get('/:slug', async (req: Request, res: Response) => {
     
     const { data: post, error } = await supabaseService.getClient()
       .from('blog_posts')
-      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured')
+      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, cover_image')
       .eq('slug', slug)
       .eq('published', true)
       .single()
@@ -133,7 +133,7 @@ router.get('/admin/all', [authenticate, authorize('admin')], async (req: AuthReq
     
     const { data: posts, error } = await supabaseService.getClient()
       .from('blog_posts')
-      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, published')
+      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, published, cover_image')
       .order('created_at', { ascending: false })
     
     if (error) throw error
@@ -184,7 +184,8 @@ router.post('/', [
   body('category').isLength({ min: 1 }).trim(),
   body('tags').isArray({ min: 1 }),
   body('featured').optional().isBoolean(),
-  body('published').optional().isBoolean()
+  body('published').optional().isBoolean(),
+  body('cover_image').optional().isString()
 ], async (req: AuthRequest, res: Response) => {
   try {
     const errors = validationResult(req)
@@ -196,7 +197,7 @@ router.post('/', [
       })
     }
 
-    const { title, excerpt, content, category, tags, featured = false, published = false, author, read_time, publish_date } = req.body
+    const { title, excerpt, content, category, tags, featured = false, published = false, author, read_time, publish_date, cover_image } = req.body
 
     const { supabaseService } = getServices()
     // Create slug from title
@@ -242,6 +243,9 @@ router.post('/', [
     // Add optional fields if provided
     if (author) insertData.author = author
     if (read_time) insertData.read_time = read_time
+    if (cover_image !== undefined && cover_image !== null && cover_image !== '') {
+      insertData.cover_image = cover_image
+    }
     if (publish_date) {
       // Use created_at as the publish date (publish_date column may not exist)
       insertData.created_at = publish_date
@@ -289,7 +293,8 @@ router.put('/:id', [
   body('category').optional().isLength({ min: 1 }).trim(),
   body('tags').optional().isArray({ min: 1 }),
   body('featured').optional().isBoolean(),
-  body('published').optional().isBoolean()
+  body('published').optional().isBoolean(),
+  body('cover_image').optional().isString()
 ], async (req: AuthRequest, res: Response) => {
   try {
     const errors = validationResult(req)
@@ -355,6 +360,9 @@ router.put('/:id', [
         // Handle publish_date - only update created_at since publish_date column may not exist
         // Use created_at as the publish date
         updatePayload.created_at = updateData[key]
+      } else if (key === 'cover_image') {
+        const v = updateData[key]
+        updatePayload.cover_image = v === '' || v === undefined ? null : v
       } else {
         updatePayload[key] = updateData[key]
       }

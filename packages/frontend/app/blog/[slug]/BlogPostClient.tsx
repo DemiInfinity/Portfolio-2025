@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface BlogPost {
   id: number
@@ -19,6 +20,7 @@ interface BlogPost {
   tags: string[]
   featured: boolean
   slug: string
+  coverImage?: string | null
 }
 
 interface BlogPostClientProps {
@@ -53,7 +55,8 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
             category: data.data.category,
             tags: Array.isArray(data.data.tags) ? data.data.tags : [],
             featured: data.data.featured,
-            slug: data.data.slug
+            slug: data.data.slug,
+            coverImage: data.data.cover_image ?? null
           }
           setPost(mappedPost)
         } else {
@@ -144,9 +147,19 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="card shadow-xl overflow-hidden"
         >
-          {/* Hero Image */}
-          <div className="h-64 md:h-80 bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200 flex items-center justify-center">
-            <div className="text-6xl opacity-50">📝</div>
+          {/* Hero / cover image */}
+          <div className="relative h-64 md:h-80 bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200 overflow-hidden">
+            {post.coverImage && resolveMediaUrl(post.coverImage) ? (
+              <img
+                src={resolveMediaUrl(post.coverImage)}
+                alt={post.title}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-6xl opacity-50" aria-hidden>📝</span>
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -218,6 +231,19 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
                   code: ({children}) => <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">{children}</code>,
                   pre: ({children}) => <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>,
                   a: ({href, children}) => <a href={href} className="text-pink-600 hover:text-purple-600 underline font-medium">{children}</a>,
+                  img: ({ src, alt }) => {
+                    const resolved = src ? resolveMediaUrl(String(src)) : ''
+                    if (!resolved) return null
+                    return (
+                      <img
+                        src={resolved}
+                        alt={alt ?? ''}
+                        className="rounded-xl max-w-full h-auto my-6 shadow-md border border-pink-100"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    )
+                  },
                   strong: ({children}) => <strong className="font-semibold text-gray-900">{children}</strong>,
                   em: ({children}) => <em className="italic text-gray-700">{children}</em>
                 }}

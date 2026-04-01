@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Github, ExternalLink, Calendar, Tag } from 'lucide-react'
 import { fetchProjects } from '@/lib/api'
+import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface Project {
   id: number
@@ -131,7 +132,15 @@ export default function Projects() {
                 viewport={{ once: true }}
                 className="card hover:scale-105 transition-transform"
               >
-                <div className="h-64 bg-gradient-to-br from-pink-200 to-purple-300"></div>
+                <div className="relative h-64 bg-gradient-to-br from-pink-200 to-purple-300 overflow-hidden">
+                  {project.image && resolveMediaUrl(project.image) ? (
+                    <img
+                      src={resolveMediaUrl(project.image)}
+                      alt={project.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : null}
+                </div>
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-2xl font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
@@ -209,7 +218,15 @@ export default function Projects() {
                 viewport={{ once: true }}
                 className="card hover:scale-105 transition-transform"
               >
-                <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100"></div>
+                <div className="relative h-48 bg-gradient-to-br from-pink-100 to-purple-100 overflow-hidden">
+                  {project.image && resolveMediaUrl(project.image) ? (
+                    <img
+                      src={resolveMediaUrl(project.image)}
+                      alt={project.title}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : null}
+                </div>
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
