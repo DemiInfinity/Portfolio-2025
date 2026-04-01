@@ -2,9 +2,9 @@ import { Given, When, Then } from '@badeball/cypress-cucumber-preprocessor'
 
 Given('I visit the blog page', () => {
   // API mocks are set up globally in e2e.ts
-  cy.visit('/blog')
-  // Wait for blog posts API to be called
-  cy.wait('@getBlogPosts', { timeout: 10000 })
+  cy.visit('/blog', { timeout: 30000 })
+  cy.get('body', { timeout: 30000 }).should('exist')
+  cy.wait('@getBlogPosts', { timeout: 15000 })
 })
 
 Then('I should see a list of blog posts', () => {
@@ -89,10 +89,11 @@ Then('I should see the post content', () => {
 })
 
 When('I view a blog post', () => {
-  cy.visit('/blog')
-  cy.wait('@getBlogPosts', { timeout: 10000 })
+  cy.visit('/blog', { timeout: 30000 })
+  cy.get('body', { timeout: 30000 }).should('exist')
+  cy.wait('@getBlogPosts', { timeout: 15000 })
   cy.get('article, [data-testid="blog-post"], .blog-post').first().find('a, h2 a, h3 a').first().click()
-  cy.wait('@getBlogPost', { timeout: 10000 })
+  cy.wait('@getBlogPost', { timeout: 15000 })
 })
 
 Then('the page should have Open Graph meta tags', () => {

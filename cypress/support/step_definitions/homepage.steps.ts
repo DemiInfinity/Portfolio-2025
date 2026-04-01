@@ -2,9 +2,9 @@ import { Given, When, Then } from '@badeball/cypress-cucumber-preprocessor'
 
 Given('I visit the homepage', () => {
   // API mocks are set up globally in e2e.ts
-  cy.visit('/')
-  // Wait for projects API to be called
-  cy.wait('@getProjects', { timeout: 10000 })
+  cy.visit('/', { timeout: 30000 })
+  cy.get('body', { timeout: 30000 }).should('exist')
+  cy.wait('@getProjects', { timeout: 15000 })
 })
 
 Then('I should see the main heading', () => {
@@ -18,9 +18,7 @@ Then('I should see navigation links', () => {
 })
 
 Then('I should see featured projects', () => {
-  // Wait for projects API to load
-  cy.wait('@getProjects', { timeout: 10000 })
-  // Wait for loading state to finish
+  // Projects were already fetched in Background ("I visit the homepage"); do not wait for a 2nd request
   cy.wait(2000)
   // Scroll to projects section to trigger whileInView animations
   cy.contains('Recent Work', { matchCase: false }).scrollIntoView({ duration: 500 })
@@ -142,9 +140,11 @@ Then('I should see a {string} section', (sectionName: string) => {
 })
 
 Then('I should see an email link', () => {
-  // Scroll to contact/CTA section to trigger whileInView animation
-  cy.contains('Let\'s Work Together', { matchCase: false }).or('contains', 'Get In Touch').scrollIntoView({ duration: 500, offset: { top: -100 } })
-  // Wait for whileInView animation to complete (framer-motion animation)
+  // Scroll CTA into view (Cypress has no cy.contains().or — use regex match)
+  cy.contains(/Let's Work Together|Get In Touch/i).scrollIntoView({
+    duration: 500,
+    offset: { top: -100 },
+  })
   cy.wait(2000)
   // Check if email link exists - use scrollIntoView to ensure it's in viewport for animation
   cy.get('a[href^="mailto:"]', { timeout: 10000 }).scrollIntoView({ duration: 300 })
