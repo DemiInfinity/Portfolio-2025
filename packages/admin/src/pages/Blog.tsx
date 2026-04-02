@@ -248,7 +248,7 @@ const Blog = () => {
                   <span key={tag} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
                     {tag}
                   </span>
-                )}
+                ))}
                 {post.tags.length > 3 && (
                   <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded-full font-medium">
                     +{post.tags.length - 3} more
