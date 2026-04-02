@@ -15,7 +15,7 @@ interface Project {
 }
 
 export const metadata: Metadata = {
-  title: 'Home',
+  title: 'Home | Demi Taylor Nimmo',
 }
 
 export default async function Home() {
