@@ -150,10 +150,43 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
             ) : null}
 
             {project.content ? (
-              <div className="prose prose-lg max-w-none text-gray-800 leading-relaxed markdown-content">
+              <div
+                className="prose prose-lg max-w-none text-gray-800 leading-relaxed markdown-content"
+                style={{ fontFamily: 'Poppins, sans-serif' }}
+              >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
+                    h1: ({ children }) => (
+                      <h1 className="text-3xl font-bold text-gray-900 mb-6 mt-8" style={{ fontFamily: 'Playfair Display, serif' }}>
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-7" style={{ fontFamily: 'Playfair Display, serif' }}>
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+                        {children}
+                      </h3>
+                    ),
+                    p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2">{children}</ol>,
+                    li: ({ children }) => <li className="ml-4">{children}</li>,
+                    blockquote: ({ children }) => (
+                      <blockquote className="border-l-4 border-pink-300 pl-4 italic text-gray-700 mb-4 bg-pink-50 py-2 rounded-r-lg">
+                        {children}
+                      </blockquote>
+                    ),
+                    code: ({ children }) => (
+                      <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">{children}</code>
+                    ),
+                    pre: ({ children }) => (
+                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>
+                    ),
                     img: ({ src, alt }) => {
                       const resolved = src ? resolveMediaUrl(String(src)) : ''
                       if (!resolved) return null
@@ -172,6 +205,8 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
                         {children}
                       </a>
                     ),
+                    strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                    em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
                   }}
                 >
                   {project.content}
