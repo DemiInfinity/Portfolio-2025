@@ -201,64 +201,75 @@ const Blog = () => {
         </button>
       </div>
 
-      {/* Posts List */}
-      <div className="space-y-4">
+      {/* Posts Grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {posts?.map((post) => (
           <div key={post.id} className="card p-6 hover:scale-105 transition-all duration-300">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    {post.title}
-                  </h3>
-                  <div className="flex space-x-2">
-                    {post.featured && (
-                      <span className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-full">
-                        ⭐ Featured
-                      </span>
-                    )}
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                      post.published 
-                        ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white' 
-                        : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                    }`}>
-                      {post.published ? '🚀 Published' : '📝 Draft'}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-gray-600 line-clamp-2 font-medium mb-3">
-                  {post.excerpt}
-                </p>
-                <div className="flex items-center text-sm text-pink-600 space-x-4 mb-3">
-                  <span className="flex items-center">📂 {post.category}</span>
-                  <span className="flex items-center">⏱️ {post.read_time} min read</span>
-                  <span className="flex items-center">📅 {post.publish_date ? new Date(post.publish_date).toLocaleDateString() : 'Date not available'}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {post.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
-                      {tag}
-                    </span>
-                  ))}
-                  {post.tags.length > 3 && (
-                    <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded-full font-medium">
-                      +{post.tags.length - 3} more
-                    </span>
+            <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
+              {post.cover_image ? (
+                <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-4xl opacity-50">📝</span>
+              )}
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-lg font-semibold text-gray-800 line-clamp-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                  {post.title}
+                </h3>
+                {post.featured && (
+                  <span className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-full whitespace-nowrap">
+                    ⭐ Featured
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                  post.published
+                    ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white'
+                    : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
+                }`}>
+                  {post.published ? '🚀 Published' : '📝 Draft'}
+                </span>
+                <span className="text-xs text-pink-600 font-medium">⏱️ {post.read_time} min read</span>
+              </div>
+              <p className="text-sm text-gray-600 line-clamp-3 font-medium">
+                {post.excerpt}
+              </p>
+              <div className="flex items-center text-sm text-pink-600 gap-3">
+                <span className="truncate">📂 {post.category}</span>
+                <span className="text-gray-400">•</span>
+                <span className="truncate">
+                  📅 {post.publish_date ? new Date(post.publish_date).toLocaleDateString() : 'Date not available'}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {post.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
+                    {tag}
+                  </span>
+                )}
+                {post.tags.length > 3 && (
+                  <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded-full font-medium">
+                    +{post.tags.length - 3} more
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex space-x-3">
+                  {post.published && (
+                    <a
+                      href={`https://demitaylornimmo.com/blog/${post.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+                      title="View Post"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </a>
                   )}
                 </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {post.published && (
-                  <a
-                    href={`https://demitaylornimmo.com/blog/${post.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
-                    title="View Post"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </a>
-                )}
+                <div className="flex space-x-2">
                 <button
                   onClick={() => openModal(post)}
                   className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
@@ -275,6 +286,7 @@ const Blog = () => {
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
+                </div>
               </div>
             </div>
           </div>
