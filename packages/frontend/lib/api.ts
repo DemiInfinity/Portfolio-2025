@@ -18,7 +18,9 @@ export async function fetchProjects() {
 
 export async function fetchProjectById(id: string | number) {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${id}`)
+    const response = await fetch(`${API_BASE_URL}/projects/${id}`, {
+      cache: 'no-store',
+    })
     if (!response.ok) {
       throw new Error('Failed to fetch project')
     }
