@@ -138,22 +138,50 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
               </div>
             ) : null}
 
-            {project.inspiration ? (
-              <div className="mb-10">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-3" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  Inspiration
+            {/* Gallery first */}
+            {gallery.length > 0 ? (
+              <div className="mb-12">
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  Gallery
                 </h2>
-                <p className="text-gray-700 leading-relaxed font-medium" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  {project.inspiration}
-                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {gallery.map((src, idx) => {
+                    const resolved = resolveMediaUrl(src)
+                    return (
+                      <div
+                        key={`${src}-${idx}`}
+                        className="relative rounded-2xl overflow-hidden border border-pink-100 bg-white/60"
+                      >
+                        {resolved ? (
+                          <img
+                            src={resolved}
+                            alt={`${project.title} screenshot ${idx + 1}`}
+                            className="w-full h-56 object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="h-56 flex items-center justify-center text-gray-500">
+                            <ImageIcon className="w-6 h-6 mr-2" />
+                            Image
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ) : null}
 
+            {/* Then long-form description (markdown) */}
             {project.content ? (
               <div
-                className="prose prose-lg max-w-none text-gray-800 leading-relaxed markdown-content"
+                className="text-gray-800 leading-relaxed"
                 style={{ fontFamily: 'Poppins, sans-serif' }}
               >
+                <h2 className="text-2xl font-semibold text-gray-800 mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  Project Description
+                </h2>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -181,11 +209,21 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
                         {children}
                       </blockquote>
                     ),
-                    code: ({ children }) => (
-                      <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">{children}</code>
-                    ),
+                    code: ({ children, className }) => {
+                      const isBlock = typeof className === 'string' && className.includes('language-')
+                      if (isBlock) {
+                        return <code className="text-sm font-mono">{children}</code>
+                      }
+                      return (
+                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">
+                          {children}
+                        </code>
+                      )
+                    },
                     pre: ({ children }) => (
-                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>
+                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-6 border border-gray-800">
+                        {children}
+                      </pre>
                     ),
                     img: ({ src, alt }) => {
                       const resolved = src ? resolveMediaUrl(String(src)) : ''
@@ -214,28 +252,15 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
               </div>
             ) : null}
 
-            {gallery.length > 0 ? (
+            {/* Then inspiration */}
+            {project.inspiration ? (
               <div className="mt-12">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  Gallery
+                <h2 className="text-2xl font-semibold text-gray-800 mb-3" style={{ fontFamily: 'Playfair Display, serif' }}>
+                  Inspiration
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {gallery.map((src, idx) => {
-                    const resolved = resolveMediaUrl(src)
-                    return (
-                      <div key={`${src}-${idx}`} className="relative rounded-2xl overflow-hidden border border-pink-100 bg-white/60">
-                        {resolved ? (
-                          <img src={resolved} alt={`${project.title} screenshot ${idx + 1}`} className="w-full h-56 object-cover" />
-                        ) : (
-                          <div className="h-56 flex items-center justify-center text-gray-500">
-                            <ImageIcon className="w-6 h-6 mr-2" />
-                            Image
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                <p className="text-gray-700 leading-relaxed font-medium" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                  {project.inspiration}
+                </p>
               </div>
             ) : null}
           </div>
