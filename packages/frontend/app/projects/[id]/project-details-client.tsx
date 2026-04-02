@@ -258,9 +258,73 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
                 <h2 className="text-2xl font-semibold text-gray-800 mb-3" style={{ fontFamily: 'Playfair Display, serif' }}>
                   Inspiration
                 </h2>
-                <p className="text-gray-700 leading-relaxed font-medium" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  {project.inspiration}
-                </p>
+                <div className="text-gray-800 leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h1: ({ children }) => (
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4 mt-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+                          {children}
+                        </h1>
+                      ),
+                      h2: ({ children }) => (
+                        <h2 className="text-xl font-semibold text-gray-800 mb-3 mt-5" style={{ fontFamily: 'Playfair Display, serif' }}>
+                          {children}
+                        </h2>
+                      ),
+                      h3: ({ children }) => (
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2 mt-4" style={{ fontFamily: 'Playfair Display, serif' }}>
+                          {children}
+                        </h3>
+                      ),
+                      p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2">{children}</ol>,
+                      li: ({ children }) => <li className="ml-4">{children}</li>,
+                      blockquote: ({ children }) => (
+                        <blockquote className="border-l-4 border-pink-300 pl-4 italic text-gray-700 mb-4 bg-pink-50 py-2 rounded-r-lg">
+                          {children}
+                        </blockquote>
+                      ),
+                      code: ({ children, className }) => {
+                        const isBlock = typeof className === 'string' && className.includes('language-')
+                        if (isBlock) return <code className="text-sm font-mono">{children}</code>
+                        return (
+                          <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">
+                            {children}
+                          </code>
+                        )
+                      },
+                      pre: ({ children }) => (
+                        <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-6 border border-gray-800">
+                          {children}
+                        </pre>
+                      ),
+                      img: ({ src, alt }) => {
+                        const resolved = src ? resolveMediaUrl(String(src)) : ''
+                        if (!resolved) return null
+                        return (
+                          <img
+                            src={resolved}
+                            alt={alt ?? ''}
+                            className="rounded-xl max-w-full h-auto my-6 shadow-md border border-pink-100"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )
+                      },
+                      a: ({ href, children }) => (
+                        <a href={href} className="text-pink-600 hover:text-purple-600 underline font-medium">
+                          {children}
+                        </a>
+                      ),
+                      strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                      em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+                    }}
+                  >
+                    {project.inspiration}
+                  </ReactMarkdown>
+                </div>
               </div>
             ) : null}
           </div>
