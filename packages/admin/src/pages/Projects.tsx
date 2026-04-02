@@ -139,31 +139,58 @@ const Projects = () => {
   const openModal = (project?: Project) => {
     if (project) {
       setEditingProject(project)
-      // Format date for HTML date input (YYYY-MM-DD)
-      const formattedDate = project.date 
+      // Open modal immediately with list data, then hydrate with full record
+      const formattedDate = project.date
         ? new Date(project.date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0]
-      
-      // Ensure technologies is an array before joining
-      const technologiesString = Array.isArray(project.technologies) 
+
+      const technologiesString = Array.isArray(project.technologies)
         ? project.technologies.join(', ')
         : (typeof project.technologies === 'string' ? project.technologies : '')
 
-      const imagesString = Array.isArray(project.images) ? project.images.join('\n') : ''
-      
       reset({
         title: project.title,
         description: project.description,
         image: project.image,
         content: project.content || '',
         inspiration: project.inspiration || '',
-        images: imagesString,
+        images: Array.isArray(project.images) ? project.images.join('\n') : '',
         status: project.status || 'in_development',
         technologies: technologiesString,
         github_url: project.github_url,
         live_url: project.live_url,
         date: formattedDate,
         featured: project.featured
+      })
+
+      api.get(`/projects/${project.id}`).then((res) => {
+        const full = res.data?.data as Project | undefined
+        if (!full) return
+
+        const fullDate = full.date
+          ? new Date(full.date).toISOString().split('T')[0]
+          : formattedDate
+
+        const fullTech = Array.isArray(full.technologies)
+          ? full.technologies.join(', ')
+          : (typeof full.technologies === 'string' ? full.technologies : technologiesString)
+
+        reset({
+          title: full.title || project.title,
+          description: full.description || project.description,
+          image: full.image || project.image,
+          content: full.content || '',
+          inspiration: full.inspiration || '',
+          images: Array.isArray(full.images) ? full.images.join('\n') : '',
+          status: full.status || project.status || 'in_development',
+          technologies: fullTech,
+          github_url: full.github_url || project.github_url,
+          live_url: full.live_url || project.live_url,
+          date: fullDate,
+          featured: Boolean(full.featured)
+        })
+      }).catch(() => {
+        // If hydration fails, keep the list data; don't block editing
       })
     } else {
       setEditingProject(null)
