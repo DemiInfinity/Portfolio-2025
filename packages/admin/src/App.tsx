@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
@@ -16,6 +17,26 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 
 function App() {
   const { user, loading } = useAuth()
+  const location = useLocation()
+
+  useEffect(() => {
+    const path = location.pathname
+    const pageTitleMap: Record<string, string> = {
+      '/': 'Dashboard',
+      '/projects': 'Projects',
+      '/learning': 'Learning',
+      '/work-history': 'Work History',
+      '/education': 'Education',
+      '/certifications': 'Certifications',
+      '/blog': 'Blog',
+      '/analytics': 'Analytics',
+      '/feature-flags': 'Feature Flags',
+      '/settings': 'Settings',
+    }
+
+    const page = !user ? 'Login' : (pageTitleMap[path] || 'Dashboard')
+    document.title = `${page} | Admin | Demi Taylor Nimmo`
+  }, [location.pathname, user])
 
   if (loading) {
     return <LoadingSpinner />
