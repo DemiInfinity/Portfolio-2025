@@ -11,6 +11,10 @@ interface Project {
   title: string
   description: string
   image?: string
+  content?: string
+  inspiration?: string
+  images?: string[]
+  status?: 'in_development' | 'ideas' | 'completed'
   technologies: string[] | string
   github_url?: string
   live_url?: string
@@ -22,6 +26,10 @@ interface ProjectForm {
   title: string
   description: string
   image?: string
+  content: string
+  inspiration: string
+  images: string
+  status: 'in_development' | 'ideas' | 'completed'
   technologies: string
   github_url?: string
   live_url?: string
@@ -63,12 +71,15 @@ const Projects = () => {
     })
   })
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectForm>()
+  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<ProjectForm>()
 
   const createMutation = useMutation(
     (data: ProjectForm) => api.post('/projects', {
       ...data,
-      technologies: data.technologies.split(',').map(t => t.trim())
+      technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
+      images: data.images
+        ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
+        : []
     }),
     {
       onSuccess: () => {
@@ -87,7 +98,10 @@ const Projects = () => {
   const updateMutation = useMutation(
     ({ id, data }: { id: number, data: ProjectForm }) => api.put(`/projects/${id}`, {
       ...data,
-      technologies: data.technologies.split(',').map(t => t.trim())
+      technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
+      images: data.images
+        ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
+        : []
     }),
     {
       onSuccess: () => {
@@ -134,11 +148,17 @@ const Projects = () => {
       const technologiesString = Array.isArray(project.technologies) 
         ? project.technologies.join(', ')
         : (typeof project.technologies === 'string' ? project.technologies : '')
+
+      const imagesString = Array.isArray(project.images) ? project.images.join('\n') : ''
       
       reset({
         title: project.title,
         description: project.description,
         image: project.image,
+        content: project.content || '',
+        inspiration: project.inspiration || '',
+        images: imagesString,
+        status: project.status || 'in_development',
         technologies: technologiesString,
         github_url: project.github_url,
         live_url: project.live_url,
@@ -151,6 +171,10 @@ const Projects = () => {
         title: '',
         description: '',
         image: '',
+        content: '',
+        inspiration: '',
+        images: '',
+        status: 'in_development',
         technologies: '',
         github_url: '',
         live_url: '',
@@ -159,6 +183,19 @@ const Projects = () => {
       })
     }
     setIsModalOpen(true)
+  }
+
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'in_development':
+        return '🚧 In Development'
+      case 'ideas':
+        return '💡 Ideas'
+      case 'completed':
+        return '✅ Completed'
+      default:
+        return '🚧 In Development'
+    }
   }
 
   const closeModal = () => {
@@ -215,6 +252,11 @@ const Projects = () => {
                     ⭐ Featured
                   </span>
                 )}
+              </div>
+              <div>
+                <span className="px-3 py-1 text-xs font-semibold bg-white/70 border border-pink-200 text-pink-700 rounded-full">
+                  {getStatusLabel(project.status)}
+                </span>
               </div>
               <p className="text-sm text-gray-600 line-clamp-3 font-medium">{project.description}</p>
               <div className="flex flex-wrap gap-2">
@@ -332,6 +374,49 @@ const Projects = () => {
                         />
                       </div>
                     </div>
+
+                    <div className="form-group">
+                      <label className="form-label">✨ Inspiration (optional)</label>
+                      <textarea
+                        {...register('inspiration')}
+                        rows={3}
+                        className="form-textarea"
+                        placeholder="What inspired this project? The problem you wanted to solve, the story behind it, etc."
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">📝 Project details (optional)</label>
+                      <p className="text-sm text-gray-500 mb-2">
+                        Markdown supported. This will show on the project details page.
+                      </p>
+                      <textarea
+                        {...register('content')}
+                        rows={10}
+                        className="form-textarea"
+                        placeholder="Add a deeper write-up: features, challenges, wins, learnings…"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">🖼️ Gallery images (one URL per line)</label>
+                      <p className="text-sm text-gray-500 mb-2">Shown on the project details page.</p>
+                      <textarea
+                        {...register('images')}
+                        rows={5}
+                        className="form-textarea"
+                        placeholder={"https://…\nhttps://…"}
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <ImageUploadButton
+                          label="Upload → add to gallery"
+                          onUploaded={(url) => {
+                            const cur = getValues('images') || ''
+                            setValue('images', cur ? `${cur}\n${url}` : url)
+                          }}
+                        />
+                      </div>
+                    </div>
                     <div className="form-group">
                       <label className="form-label">🛠️ Technologies (comma-separated)</label>
                       <input
@@ -341,6 +426,19 @@ const Projects = () => {
                         className="form-input"
                       />
                       {errors.technologies && <p className="text-red-500 text-sm mt-1">{errors.technologies.message}</p>}
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">📌 Status</label>
+                      <select
+                        {...register('status')}
+                        className="form-input"
+                        defaultValue="in_development"
+                      >
+                        <option value="in_development">🚧 In Development</option>
+                        <option value="ideas">💡 Ideas</option>
+                        <option value="completed">✅ Completed</option>
+                      </select>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="form-group">

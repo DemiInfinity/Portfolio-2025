@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Github, ExternalLink, Calendar, Tag } from 'lucide-react'
+import { Github, ExternalLink, Calendar, ArrowRight } from 'lucide-react'
 import { fetchProjects } from '@/lib/api'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
+import Link from 'next/link'
 
 interface Project {
   id: number
@@ -16,7 +17,7 @@ interface Project {
   live_url?: string
   date: string
   featured: boolean
-  status?: 'active' | 'on_hold' | 'completed'
+  status?: 'in_development' | 'ideas' | 'completed'
 }
 
 // Format project date from YYYY-MM-DD to Month Day, Year
@@ -33,6 +34,7 @@ const formatProjectDate = (dateString: string) => {
 export default function Projects() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedStatus, setSelectedStatus] = useState<'All' | 'in_development' | 'ideas' | 'completed'>('All')
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -83,6 +85,36 @@ export default function Projects() {
   const featuredProjects = projects.filter(project => project.featured)
   const otherProjects = projects.filter(project => !project.featured)
 
+  const statusLabel = (status?: Project['status']) => {
+    switch (status) {
+      case 'in_development':
+        return '🚧 In Development'
+      case 'ideas':
+        return '💡 Ideas'
+      case 'completed':
+        return '✅ Completed'
+      default:
+        return '🚧 In Development'
+    }
+  }
+
+  const statusBadgeClass = (status?: Project['status']) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-gradient-to-r from-green-100 to-emerald-100 text-emerald-800'
+      case 'ideas':
+        return 'bg-gradient-to-r from-yellow-100 to-orange-100 text-orange-800'
+      case 'in_development':
+      default:
+        return 'bg-gradient-to-r from-pink-100 to-purple-100 text-pink-800'
+    }
+  }
+
+  const matchesStatus = (p: Project) => selectedStatus === 'All' || (p.status || 'in_development') === selectedStatus
+
+  const filteredFeatured = featuredProjects.filter(matchesStatus)
+  const filteredOther = otherProjects.filter(matchesStatus)
+
   return (
     <div className="min-h-screen py-20" style={{ background: 'linear-gradient(135deg, #f8f4ff 0%, #fff8f0 50%, #ffb3ba 100%)' }}>
       {/* Decorative elements */}
@@ -110,7 +142,36 @@ export default function Projects() {
           </p>
         </motion.div>
 
+        {/* Status Filter */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.05 }}
+          className="flex flex-wrap gap-2 justify-center mb-12"
+        >
+          {([
+            { id: 'All', label: 'All ✨' },
+            { id: 'in_development', label: '🚧 In Development' },
+            { id: 'ideas', label: '💡 Ideas' },
+            { id: 'completed', label: '✅ Completed' },
+          ] as const).map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setSelectedStatus(opt.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 ${
+                selectedStatus === opt.id
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-white text-gray-700 hover:bg-gradient-to-r hover:from-pink-100 hover:to-purple-100 hover:text-pink-700 border border-pink-200'
+              }`}
+              style={{ fontFamily: 'Poppins, sans-serif' }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </motion.div>
+
         {/* Featured Projects */}
+        {filteredFeatured.length > 0 && (
         <section className="mb-20">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -123,7 +184,7 @@ export default function Projects() {
           </motion.h2>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {featuredProjects.map((project, index) => (
+            {filteredFeatured.map((project, index) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -146,11 +207,9 @@ export default function Projects() {
                     <h3 className="text-2xl font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
                       {project.title}
                     </h3>
-                    {project.status === 'on_hold' && (
-                      <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                        On Hold
-                      </span>
-                    )}
+                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusBadgeClass(project.status)}`}>
+                      {statusLabel(project.status)}
+                    </span>
                   </div>
                   <p className="text-gray-600 mb-4 font-medium">
                     {project.description}
@@ -167,7 +226,14 @@ export default function Projects() {
                       <Calendar className="w-4 h-4 mr-1" />
                       {formatProjectDate(project.date)}
                     </div>
-                    <div className="flex space-x-3">
+                    <div className="flex items-center space-x-3">
+                      <Link
+                        href={`/projects/${project.id}`}
+                        className="p-2 bg-white/80 hover:bg-pink-100 rounded-full transition-colors"
+                        aria-label={`View details for ${project.title}`}
+                      >
+                        <ArrowRight className="w-5 h-5 text-gray-600 hover:text-pink-600" />
+                      </Link>
                       {project.github_url && (
                         <a
                           href={project.github_url}
@@ -195,8 +261,10 @@ export default function Projects() {
             ))}
           </div>
         </section>
+        )}
 
         {/* Other Projects */}
+        {filteredOther.length > 0 && (
         <section>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -209,7 +277,7 @@ export default function Projects() {
           </motion.h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {otherProjects.map((project, index) => (
+            {filteredOther.map((project, index) => (
               <motion.div
                 key={project.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -233,11 +301,9 @@ export default function Projects() {
                       <h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
                         {project.title}
                       </h3>
-                      {project.status === 'on_hold' && (
-                        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
-                          On Hold
-                        </span>
-                      )}
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusBadgeClass(project.status)}`}>
+                        {statusLabel(project.status)}
+                      </span>
                     </div>
                     <div className="flex items-center text-pink-600 text-sm font-medium">
                       <Calendar className="w-4 h-4 mr-1" />
@@ -266,6 +332,12 @@ export default function Projects() {
                   </div>
                   
                   <div className="flex space-x-3">
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="btn-secondary text-xs px-3 py-1"
+                    >
+                      Details ✨
+                    </Link>
                     <a
                       href={project.github_url}
                       target="_blank"
@@ -292,6 +364,13 @@ export default function Projects() {
             ))}
           </div>
         </section>
+        )}
+
+        {filteredFeatured.length === 0 && filteredOther.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-gray-700 font-medium">No projects found for that status. ✨</p>
+          </div>
+        ) : null}
       </div>
     </div>
   )

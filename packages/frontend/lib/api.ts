@@ -16,6 +16,20 @@ export async function fetchProjects() {
   }
 }
 
+export async function fetchProjectById(id: string | number) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/projects/${id}`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch project')
+    }
+    const data = await response.json()
+    return data.data || null
+  } catch (error) {
+    console.error('Error fetching project:', error)
+    return null
+  }
+}
+
 export async function fetchBlogPosts() {
   try {
     const response = await fetch(`${API_BASE_URL}/blog`)

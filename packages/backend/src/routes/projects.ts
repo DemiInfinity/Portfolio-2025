@@ -6,13 +6,15 @@ import { getServices } from '../services'
 
 const router = express.Router()
 
+const ALLOWED_STATUSES = new Set(['in_development', 'ideas', 'completed'])
+
 // Get all projects (public)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { supabaseService } = getServices()
     const projects = await supabaseService.select(
       'projects', 
-      'id, title, description, image, technologies, github_url, live_url, featured, date, created_at, updated_at'
+      'id, title, description, image, technologies, github_url, live_url, featured, date, created_at, updated_at, inspiration, images, status'
     )
 
     // Sort by featured first, then by created_at desc
@@ -35,6 +37,15 @@ router.get('/', async (req: Request, res: Response) => {
             return project.technologies.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
           }
           return Array.isArray(project.technologies) ? project.technologies : []
+        } catch {
+          return []
+        }
+      })(),
+      images: (() => {
+        try {
+          if (project.images == null) return []
+          if (typeof project.images === 'string') return JSON.parse(project.images)
+          return Array.isArray(project.images) ? project.images : []
         } catch {
           return []
         }
@@ -64,7 +75,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     const project = await supabaseService.selectOne(
       'projects', 
       id, 
-      'id, title, description, content, image, technologies, github_url, live_url, featured, date, created_at, updated_at'
+      'id, title, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status'
     )
 
     if (!project) {
@@ -79,6 +90,15 @@ router.get('/:id', async (req: Request, res: Response) => {
       technologies: typeof project.technologies === 'string' 
         ? (project.technologies.startsWith('[') ? JSON.parse(project.technologies) : project.technologies.split(',').map((t: string) => t.trim()))
         : project.technologies || [],
+      images: (() => {
+        try {
+          if (project.images == null) return []
+          if (typeof project.images === 'string') return JSON.parse(project.images)
+          return Array.isArray(project.images) ? project.images : []
+        } catch {
+          return []
+        }
+      })(),
       featured: Boolean(project.featured)
     }
 
@@ -98,7 +118,11 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Create project (admin only)
 router.post('/', authenticate, authorize('admin'), [
   body('title').notEmpty().withMessage('Title is required'),
-  body('description').notEmpty().withMessage('Description is required')
+  body('description').notEmpty().withMessage('Description is required'),
+  body('content').optional().isString(),
+  body('inspiration').optional().isString(),
+  body('images').optional().isArray(),
+  body('status').optional().isIn(Array.from(ALLOWED_STATUSES))
 ], async (req: AuthRequest, res: Response) => {
   try {
     const errors = validationResult(req)
@@ -109,13 +133,16 @@ router.post('/', authenticate, authorize('admin'), [
       })
     }
 
-    const { title, description, content, technologies, github_url, live_url, image, featured, date } = req.body
+    const { title, description, content, inspiration, images, status, technologies, github_url, live_url, image, featured, date } = req.body
     const { supabaseService } = getServices()
 
     const newProject = await supabaseService.insert('projects', {
       title,
       description,
       content,
+      inspiration,
+      images: images || [],
+      status: status || 'in_development',
       technologies: technologies || [],
       github_url,
       live_url,
@@ -131,6 +158,15 @@ router.post('/', authenticate, authorize('admin'), [
         technologies: typeof newProject.technologies === 'string' 
           ? (newProject.technologies.startsWith('[') ? JSON.parse(newProject.technologies) : newProject.technologies.split(',').map((t: string) => t.trim()))
           : newProject.technologies || [],
+        images: (() => {
+          try {
+            if (newProject.images == null) return []
+            if (typeof newProject.images === 'string') return JSON.parse(newProject.images)
+            return Array.isArray(newProject.images) ? newProject.images : []
+          } catch {
+            return []
+          }
+        })(),
         featured: Boolean(newProject.featured)
       }
     })
@@ -149,6 +185,10 @@ router.put('/:id', [
   authorize('admin'),
   body('title').optional().isLength({ min: 1 }).trim(),
   body('description').optional().isLength({ min: 1 }).trim(),
+  body('content').optional().isString(),
+  body('inspiration').optional().isString(),
+  body('images').optional().isArray(),
+  body('status').optional().isIn(Array.from(ALLOWED_STATUSES)),
   body('image').optional().custom((value) => {
     if (value === null || value === '' || value === undefined) return true
     return typeof value === 'string'
@@ -210,6 +250,8 @@ router.put('/:id', [
       if (key === 'technologies') {
         // Ensure technologies is stored as JSON string
         updatePayload[key] = JSON.stringify(updateData[key])
+      } else if (key === 'images') {
+        updatePayload.images = JSON.stringify(updateData[key])
       } else if (key === 'image_url') {
         // Map image_url to image if provided (allow null/empty)
         updatePayload.image = updateData[key] || null
@@ -246,6 +288,15 @@ router.put('/:id', [
             if (typeof updatedProject.technologies === 'string') {
               return updatedProject.technologies.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
             }
+            return []
+          }
+        })(),
+        images: (() => {
+          try {
+            if (updatedProject.images == null) return []
+            if (typeof updatedProject.images === 'string') return JSON.parse(updatedProject.images)
+            return Array.isArray(updatedProject.images) ? updatedProject.images : []
+          } catch {
             return []
           }
         })(),

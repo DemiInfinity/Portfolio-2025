@@ -11,6 +11,16 @@ ADD COLUMN IF NOT EXISTS cover_image TEXT;
 ALTER TABLE projects
 ADD COLUMN IF NOT EXISTS image TEXT;
 
+-- Project details page content (long-form) + gallery
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS content TEXT,
+ADD COLUMN IF NOT EXISTS inspiration TEXT,
+ADD COLUMN IF NOT EXISTS images JSONB DEFAULT '[]'::jsonb;
+
+-- Project status (used for filtering on the frontend)
+ALTER TABLE projects
+ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'in_development';
+
 -- Add missing columns to analytics table  
 ALTER TABLE analytics
 ADD COLUMN IF NOT EXISTS page_title VARCHAR(500),
