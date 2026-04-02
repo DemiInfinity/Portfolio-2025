@@ -13,7 +13,10 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'),
-  title: 'Demi Taylor Nimmo - Full Stack Software Engineer ✨',
+  title: {
+    default: 'Home | Demi Taylor Nimmo',
+    template: '%s | Demi Taylor Nimmo',
+  },
   description: 'Beautiful portfolio of Demi Taylor Nimmo, showcasing creative projects, skills, and professional experience in software engineering.',
   keywords: 'software engineer, full stack developer, web development, portfolio, creative developer',
   authors: [{ name: 'Demi Taylor Nimmo' }],
@@ -26,7 +29,7 @@ export const metadata: Metadata = {
     apple: { url: '/brand-logo.png', type: 'image/png' },
   },
   openGraph: {
-    title: 'Demi Taylor Nimmo - Full Stack Software Engineer ✨',
+    title: 'Home | Demi Taylor Nimmo',
     description: 'Beautiful portfolio showcasing creative projects, skills, and professional experience.',
     type: 'website',
   },

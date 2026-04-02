@@ -36,14 +36,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   
   if (!post) {
     return {
-      title: 'Blog Post Not Found',
+      title: 'Blog Post Not Found | Blog',
       description: 'The blog post you are looking for does not exist.'
     }
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'
   const url = `${siteUrl}/blog/${params.slug}`
-  const title = `${post.title} | Demi Taylor Nimmo`
+  const title = `${post.title} | Blog`
   const description = post.excerpt || 'Read this blog post by Demi Taylor Nimmo'
   const author = post.author || 'Demi Taylor Nimmo'
   const ogImage = post.cover_image ? resolveMediaUrl(post.cover_image) : undefined

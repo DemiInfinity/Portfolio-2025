@@ -11,7 +11,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const slug = params.slug
   const project = /^\d+$/.test(slug) ? await fetchProjectById(slug) : await fetchProjectBySlug(slug)
-  if (!project) return { title: 'Project Not Found' }
+  if (!project) return { title: 'Project Not Found | Projects' }
 
   const title = `${project.title} | Projects`
   const description = project.description || undefined
