@@ -12,17 +12,35 @@ interface Project {
   title: string
   description: string
   image?: string
-  technologies: string[]
+  technologies?: string[] | string
   github_url?: string
   live_url?: string
-  date: string
+  date?: string | null
   featured: boolean
   status?: 'in_development' | 'ideas' | 'completed'
 }
 
-const formatProjectDate = (dateString: string) => {
-  const [year, month, day] = dateString.split('-')
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+function projectTechnologies(project: Project): string[] {
+  const t = project.technologies
+  if (Array.isArray(t)) return t
+  if (typeof t === 'string') {
+    try {
+      if (t.startsWith('[')) return JSON.parse(t) as string[]
+      return t.split(',').map((s) => s.trim()).filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+const formatProjectDate = (dateString?: string | null) => {
+  if (!dateString || typeof dateString !== 'string') return '—'
+  const ymd = dateString.slice(0, 10)
+  const [y, m, d] = ymd.split('-').map((x) => parseInt(x, 10))
+  if (!y || !m || !d) return '—'
+  const date = new Date(y, m - 1, d)
+  if (Number.isNaN(date.getTime())) return '—'
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
@@ -118,7 +136,11 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                       <span className={`px-3 py-1 text-xs font-medium rounded-full ${statusBadgeClass(project.status)}`}>{statusLabel(project.status)}</span>
                     </div>
                     <p className="text-gray-600 mb-4 font-medium">{project.description}</p>
-                    <div className="flex flex-wrap gap-2 mb-6">{project.technologies.map((tech) => (<span key={tech} className="tech-tag">{tech}</span>))}</div>
+                    <div className="flex flex-wrap gap-2 mb-6">
+                      {projectTechnologies(project).map((tech) => (
+                        <span key={tech} className="tech-tag">{tech}</span>
+                      ))}
+                    </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center text-purple-600 text-sm font-medium"><Calendar className="w-4 h-4 mr-1" />{formatProjectDate(project.date)}</div>
                       <div className="flex items-center space-x-3">
@@ -157,8 +179,19 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                     </div>
                     <p className="text-gray-600 mb-4 text-sm font-medium">{project.description}</p>
                     <div className="flex flex-wrap gap-1 mb-4">
-                      {project.technologies.slice(0, 3).map((tech) => (<span key={tech} className="px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs font-medium">{tech}</span>))}
-                      {project.technologies.length > 3 && <span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs font-medium">+{project.technologies.length - 3} more</span>}
+                      {(() => {
+                        const techs = projectTechnologies(project)
+                        return (
+                          <>
+                            {techs.slice(0, 3).map((tech) => (
+                              <span key={tech} className="px-2 py-1 bg-pink-100 text-pink-700 rounded text-xs font-medium">{tech}</span>
+                            ))}
+                            {techs.length > 3 && (
+                              <span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs font-medium">+{techs.length - 3} more</span>
+                            )}
+                          </>
+                        )
+                      })()}
                     </div>
                     <div className="flex space-x-3">
                       <Link href={`/projects/${project.slug || project.id}`} className="btn-secondary text-xs px-3 py-1">Details ✨</Link>
