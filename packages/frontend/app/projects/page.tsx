@@ -9,6 +9,7 @@ import Link from 'next/link'
 
 interface Project {
   id: number
+  slug?: string
   title: string
   description: string
   image?: string
@@ -228,7 +229,7 @@ export default function Projects() {
                     </div>
                     <div className="flex items-center space-x-3">
                       <Link
-                        href={`/projects/${project.id}`}
+                        href={`/projects/${project.slug || project.id}`}
                         className="p-2 bg-white/80 hover:bg-pink-100 rounded-full transition-colors"
                         aria-label={`View details for ${project.title}`}
                       >
@@ -333,7 +334,7 @@ export default function Projects() {
                   
                   <div className="flex space-x-3">
                     <Link
-                      href={`/projects/${project.id}`}
+                      href={`/projects/${project.slug || project.id}`}
                       className="btn-secondary text-xs px-3 py-1"
                     >
                       Details ✨

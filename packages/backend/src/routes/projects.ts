@@ -7,6 +7,14 @@ import { getServices } from '../services'
 const router = express.Router()
 
 const ALLOWED_STATUSES = new Set(['in_development', 'ideas', 'completed'])
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+function generateSlug(title: string) {
+  return String(title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
 
 // Get all projects (public)
 router.get('/', async (req: Request, res: Response) => {
@@ -14,7 +22,7 @@ router.get('/', async (req: Request, res: Response) => {
     const { supabaseService } = getServices()
     const projects = await supabaseService.select(
       'projects', 
-      'id, title, description, image, technologies, github_url, live_url, featured, date, created_at, updated_at, inspiration, images, status'
+      'id, title, slug, description, image, technologies, github_url, live_url, featured, date, created_at, updated_at, inspiration, images, status'
     )
 
     // Sort by featured first, then by created_at desc
@@ -66,6 +74,49 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
+// Get single project by slug (public)
+router.get('/slug/:slug', async (req: Request, res: Response) => {
+  try {
+    const { slug } = req.params
+    if (!slug || !SLUG_RE.test(slug)) {
+      return res.status(400).json({ success: false, error: 'Invalid slug' })
+    }
+
+    const { supabaseService } = getServices()
+    const { data: project, error } = await supabaseService.getClient()
+      .from('projects')
+      .select('id, title, slug, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status')
+      .eq('slug', slug)
+      .single()
+
+    if (error || !project) {
+      return res.status(404).json({ success: false, error: 'Project not found' })
+    }
+
+    const parsedProject = {
+      ...project,
+      technologies: typeof (project as any).technologies === 'string'
+        ? (((project as any).technologies as string).startsWith('[') ? JSON.parse((project as any).technologies) : ((project as any).technologies as string).split(',').map((t: string) => t.trim()))
+        : (project as any).technologies || [],
+      images: (() => {
+        try {
+          if ((project as any).images == null) return []
+          if (typeof (project as any).images === 'string') return JSON.parse((project as any).images)
+          return Array.isArray((project as any).images) ? (project as any).images : []
+        } catch {
+          return []
+        }
+      })(),
+      featured: Boolean((project as any).featured)
+    }
+
+    return res.json({ success: true, data: parsedProject })
+  } catch (error) {
+    console.error('Get project by slug error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
 // Get single project by ID (public)
 router.get('/:id', async (req: Request, res: Response) => {
   try {
@@ -75,7 +126,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     const project = await supabaseService.selectOne(
       'projects', 
       id, 
-      'id, title, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status'
+      'id, title, slug, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status'
     )
 
     if (!project) {
@@ -122,7 +173,8 @@ router.post('/', authenticate, authorize('admin'), [
   body('content').optional().isString(),
   body('inspiration').optional().isString(),
   body('images').optional().isArray(),
-  body('status').optional().isIn(Array.from(ALLOWED_STATUSES))
+  body('status').optional().isIn(Array.from(ALLOWED_STATUSES)),
+  body('slug').optional().isString().trim()
 ], async (req: AuthRequest, res: Response) => {
   try {
     const errors = validationResult(req)
@@ -133,11 +185,32 @@ router.post('/', authenticate, authorize('admin'), [
       })
     }
 
-    const { title, description, content, inspiration, images, status, technologies, github_url, live_url, image, featured, date } = req.body
+    const { title, description, content, inspiration, images, status, slug, technologies, github_url, live_url, image, featured, date } = req.body
     const { supabaseService } = getServices()
+
+    // Determine slug (validate or generate) and ensure uniqueness
+    const baseSlug = slug && typeof slug === 'string' && slug.trim() ? slug.trim() : generateSlug(title)
+    if (!baseSlug || !SLUG_RE.test(baseSlug)) {
+      return res.status(400).json({ success: false, error: 'Invalid slug' })
+    }
+
+    let uniqueSlug = baseSlug
+    let counter = 1
+    while (true) {
+      const { data: existing, error: existsError } = await supabaseService.getClient()
+        .from('projects')
+        .select('id')
+        .eq('slug', uniqueSlug)
+        .maybeSingle()
+      if (existsError) throw existsError
+      if (!existing) break
+      uniqueSlug = `${baseSlug}-${counter}`
+      counter++
+    }
 
     const newProject = await supabaseService.insert('projects', {
       title,
+      slug: uniqueSlug,
       description,
       content,
       inspiration,
@@ -184,6 +257,7 @@ router.put('/:id', [
   authenticate,
   authorize('admin'),
   body('title').optional().isLength({ min: 1 }).trim(),
+  body('slug').optional().isString().trim(),
   body('description').optional().isLength({ min: 1 }).trim(),
   body('content').optional().isString(),
   body('inspiration').optional().isString(),
@@ -227,7 +301,7 @@ router.put('/:id', [
     // Check if project exists
     const existingProject = await supabaseService.getClient()
       .from('projects')
-      .select('id')
+      .select('id, slug')
       .eq('id', id)
       .single()
 
@@ -252,6 +326,12 @@ router.put('/:id', [
         updatePayload[key] = JSON.stringify(updateData[key])
       } else if (key === 'images') {
         updatePayload.images = JSON.stringify(updateData[key])
+      } else if (key === 'slug') {
+        const requested = String(updateData[key] || '').trim()
+        if (!requested || !SLUG_RE.test(requested)) {
+          throw new Error('Invalid slug')
+        }
+        updatePayload.slug = requested
       } else if (key === 'image_url') {
         // Map image_url to image if provided (allow null/empty)
         updatePayload.image = updateData[key] || null
@@ -263,6 +343,20 @@ router.put('/:id', [
         updatePayload[key] = updateData[key]
       }
     })
+
+    // Enforce slug uniqueness if being updated
+    if (updatePayload.slug && updatePayload.slug !== (existingProject.data as any)?.slug) {
+      const { data: slugHit, error: slugErr } = await supabaseService.getClient()
+        .from('projects')
+        .select('id')
+        .eq('slug', updatePayload.slug)
+        .neq('id', id)
+        .maybeSingle()
+      if (slugErr) throw slugErr
+      if (slugHit) {
+        return res.status(400).json({ success: false, error: 'Slug already exists. Please choose a different slug.' })
+      }
+    }
 
     // Always update updated_at
     updatePayload.updated_at = new Date().toISOString()

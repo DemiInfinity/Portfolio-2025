@@ -12,6 +12,7 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'),
   title: 'Demi Taylor Nimmo - Full Stack Software Engineer ✨',
   description: 'Beautiful portfolio of Demi Taylor Nimmo, showcasing creative projects, skills, and professional experience in software engineering.',
   keywords: 'software engineer, full stack developer, web development, portfolio, creative developer',

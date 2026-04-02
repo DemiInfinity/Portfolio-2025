@@ -9,6 +9,7 @@ import { ImageUploadButton } from '@/components/ImageUploadButton'
 interface Project {
   id: number
   title: string
+  slug?: string
   description: string
   image?: string
   content?: string
@@ -24,6 +25,7 @@ interface Project {
 
 interface ProjectForm {
   title: string
+  slug: string
   description: string
   image?: string
   content: string
@@ -72,6 +74,21 @@ const Projects = () => {
   })
 
   const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<ProjectForm>()
+
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
+
+  const handleTitleChange = (title: string) => {
+    if (!editingProject) {
+      setValue('slug', generateSlug(title))
+    }
+  }
 
   const createMutation = useMutation(
     (data: ProjectForm) => api.post('/projects', {
@@ -150,6 +167,7 @@ const Projects = () => {
 
       reset({
         title: project.title,
+        slug: project.slug || '',
         description: project.description,
         image: project.image,
         content: project.content || '',
@@ -177,6 +195,7 @@ const Projects = () => {
 
         reset({
           title: full.title || project.title,
+          slug: full.slug || project.slug || '',
           description: full.description || project.description,
           image: full.image || project.image,
           content: full.content || '',
@@ -196,6 +215,7 @@ const Projects = () => {
       setEditingProject(null)
       reset({
         title: '',
+        slug: '',
         description: '',
         image: '',
         content: '',
@@ -368,12 +388,28 @@ const Projects = () => {
                     <div className="form-group">
                       <label className="form-label">💖 Project Title</label>
                       <input
-                        {...register('title', { required: 'Title is required' })}
+                        {...register('title', { required: 'Title is required', onChange: (e) => handleTitleChange(e.target.value) })}
                         type="text"
                         className="form-input"
                         placeholder="My Amazing Project"
                       />
                       {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">🔗 URL Slug</label>
+                      <input
+                        {...register('slug', {
+                          required: 'Slug is required',
+                          pattern: {
+                            value: /^[a-z0-9-]+$/,
+                            message: 'Slug can only contain lowercase letters, numbers, and hyphens'
+                          }
+                        })}
+                        type="text"
+                        className="form-input"
+                        placeholder="portfolio-website"
+                      />
+                      {errors.slug && <p className="text-red-500 text-sm mt-1">{errors.slug.message}</p>}
                     </div>
                     <div className="form-group">
                       <label className="form-label">📝 Description</label>

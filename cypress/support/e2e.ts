@@ -26,6 +26,28 @@ beforeEach(() => {
       body: apiData.projects,
     }).as('getProjects')
 
+    // Mock single project by slug or id
+    cy.intercept('GET', '**/api/projects/slug/*', (req) => {
+      const slug = req.url.split('/projects/slug/')[1]?.split('?')[0]
+      const fromList = apiData.projects.data.find((p: any) => p.slug === slug) || apiData.projects.data[0]
+      req.reply({
+        statusCode: 200,
+        body: { success: true, data: fromList },
+      })
+    }).as('getProjectBySlug')
+
+    cy.intercept('GET', '**/api/projects/*', (req) => {
+      const idPart = req.url.split('/projects/')[1]?.split('?')[0]
+      // Avoid catching /projects/slug/* (already handled above)
+      if (idPart?.startsWith('slug/')) return
+      const id = Number(idPart)
+      const fromList = apiData.projects.data.find((p: any) => p.id === id) || apiData.projects.data[0]
+      req.reply({
+        statusCode: 200,
+        body: { success: true, data: fromList },
+      })
+    }).as('getProject')
+
     // Single blog post MUST be registered before the list route so /api/blog/:slug is not swallowed by /api/blog
     cy.intercept('GET', '**/api/blog/*', (req) => {
       const urlParts = req.url.split('/blog/')
