@@ -269,6 +269,9 @@
   box-shadow: 0 8px 32px rgba(255, 107, 157, 0.1);
   transition: all 0.3s ease;
   position: relative;
+  /* Matches .project-card: clip the top accent bar to the rounded corners
+     instead of giving the bar its own border-radius to hand-match. */
+  overflow: hidden;
 }
 
 .card::before {
@@ -279,7 +282,12 @@
   right: 0;
   height: 4px;
   background: linear-gradient(45deg, var(--primary-pink), var(--accent-purple));
-  border-radius: 20px 20px 0 0;
+}
+
+/* Opt out of the top accent bar - e.g. cards that already have their own
+   left accent stripe (border-l-4), where the top bar was redundant. */
+.card--no-top-bar::before {
+  content: none;
 }
 
 .card:hover {
