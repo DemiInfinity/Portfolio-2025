@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, Home, Briefcase, BookOpen, Clock, FileText } from 'lucide-react'
+import { Menu, X, Home, Briefcase, BookOpen, Clock, FileText, Mail } from 'lucide-react'
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -47,6 +47,10 @@ const Navigation = () => {
                 </Link>
               )
             })}
+            <a href="mailto:demi.21@outlook.com" className="btn-primary text-sm px-4 py-2 ml-2">
+              <Mail className="w-4 h-4 mr-2" />
+              Hire Me ✨
+            </a>
           </div>
 
           {/* Mobile menu button */}
@@ -54,6 +58,8 @@ const Navigation = () => {
             <button
               onClick={() => setIsOpen(!isOpen)}
               className="btn-secondary p-2"
+              aria-label={isOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isOpen}
             >
               {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -80,6 +86,14 @@ const Navigation = () => {
                 </Link>
               )
             })}
+            <a
+              href="mailto:demi.21@outlook.com"
+              onClick={() => setIsOpen(false)}
+              className="nav-link-mobile bg-gradient-to-r from-pink-400 to-purple-500 text-white"
+            >
+              <Mail className="w-5 h-5" />
+              <span>Hire Me ✨</span>
+            </a>
           </div>
         </div>
       )}

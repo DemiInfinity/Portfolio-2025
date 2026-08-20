@@ -1,8 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ArrowRight, Code, Database, Globe, Smartphone } from 'lucide-react'
+import { ArrowRight, Code, Database, Download, Globe, RefreshCw, Smartphone, WifiOff } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface Project {
@@ -17,7 +18,14 @@ interface Project {
   featured: boolean
 }
 
-export default function HomeClient({ projects }: { projects: Project[] }) {
+export default function HomeClient({
+  projects,
+  projectsUnavailable = false,
+}: {
+  projects: Project[]
+  projectsUnavailable?: boolean
+}) {
+  const router = useRouter()
   const skills = [
     { icon: Globe, name: 'Frontend Development', description: 'Angular, StencilJS, VITE'},
     { icon: Database, name: 'Backend Development', description: 'Node.js, Express, PostgreSQL' },
@@ -138,7 +146,27 @@ export default function HomeClient({ projects }: { projects: Project[] }) {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {projects.length > 0 ? (
+            {projectsUnavailable ? (
+              <div className="col-span-full card p-10 text-center">
+                <div className="w-14 h-14 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <WifiOff className="w-7 h-7 text-pink-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
+                  Couldn't load recent projects 😔
+                </h3>
+                <p className="text-gray-600 font-medium mb-6 max-w-md mx-auto">
+                  Our server naps when idle and might just be waking up. The rest of the site is unaffected - try refreshing this section.
+                </p>
+                <button onClick={() => router.refresh()} className="btn-secondary justify-center">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry
+                </button>
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="col-span-full text-center py-6">
+                <p className="text-gray-600 font-medium">No projects published yet - check back soon! ✨</p>
+              </div>
+            ) : (
               projects.map((project, i) => (
                 <motion.div
                   key={project.id}
@@ -185,31 +213,6 @@ export default function HomeClient({ projects }: { projects: Project[] }) {
                   </div>
                 </motion.div>
               ))
-            ) : (
-              [1, 2, 3].map((i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: i * 0.1 }}
-                  viewport={{ once: true }}
-                  className="project-card"
-                >
-                  <div className="h-48 bg-gradient-to-br from-pink-200 to-purple-200"></div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                      Project {i}
-                    </h3>
-                    <p className="text-gray-600 mb-4 font-medium">
-                      A brief description of this amazing project and the technologies used to build it.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="tech-tag">React</span>
-                      <span className="tech-tag">TypeScript</span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))
             )}
           </div>
 
@@ -231,6 +234,11 @@ export default function HomeClient({ projects }: { projects: Project[] }) {
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
           >
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 backdrop-blur-sm text-white text-sm font-semibold mb-6">
+              <span className="w-2 h-2 rounded-full bg-green-300 animate-pulse" />
+              {/* Edit this line to update availability status */}
+              Open to full-stack roles and freelance work
+            </span>
             <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Dancing Script, cursive' }}>
               💖 Let's Work Together
             </h2>
@@ -238,12 +246,18 @@ export default function HomeClient({ projects }: { projects: Project[] }) {
               I'm always interested in new opportunities and exciting projects.
               Let's discuss how we can bring your beautiful ideas to life! ✨
             </p>
-            <a
-              href="mailto:demi.21@outlook.com"
-              className="btn-secondary bg-white text-pink-600 hover:bg-pink-50 font-semibold"
-            >
-              Get In Touch 💌
-            </a>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <a
+                href="mailto:demi.21@outlook.com"
+                className="btn-secondary bg-white text-pink-600 hover:bg-pink-50 font-semibold"
+              >
+                Get In Touch 💌
+              </a>
+              <a href="/resume.pdf" download className="btn-outline-white">
+                <Download className="w-4 h-4 mr-2" />
+                Download CV
+              </a>
+            </div>
           </motion.div>
         </div>
       </section>

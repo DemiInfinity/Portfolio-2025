@@ -113,6 +113,11 @@ export default function LearningClient({
             📖 Currently Learning
           </motion.h2>
           
+          {currentLearning.length === 0 && (
+            <div className="text-center py-10">
+              <p className="text-gray-700 font-medium">Nothing in progress right now. Check back soon! ✨</p>
+            </div>
+          )}
           <div className="space-y-6">
             {currentLearning.map((item, index) => (
               <motion.div

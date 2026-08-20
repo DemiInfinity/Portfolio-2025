@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { fetchLearning } from '@/lib/api'
+import { fetchLearning, ApiUnavailableError } from '@/lib/api'
 import LearningClient from './learning-client'
 
 interface LearningItem {
@@ -24,11 +24,26 @@ export default async function Learning() {
     ? `${process.env.NEXT_PUBLIC_API_URL}/api`
     : 'https://api.demitaylornimmo.com/api'
 
-  const [data, skillsResponse] = await Promise.all([
-    fetchLearning(),
-    fetch(`${API_BASE_URL}/skills`, { cache: 'no-store' }),
-  ])
-  const currentLearning: LearningItem[] = data.map((item: any) => ({
+  let skillsResponse: Response
+  let learningData: any[]
+  try {
+    ;[learningData, skillsResponse] = await Promise.all([
+      // Throws ApiUnavailableError on failure - let it bubble to error.tsx.
+      fetchLearning(),
+      fetch(`${API_BASE_URL}/skills`, { cache: 'no-store' }),
+    ])
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) throw error
+    throw new ApiUnavailableError('Unable to reach the API to load skills.', { cause: error })
+  }
+
+  if (!skillsResponse.ok) {
+    throw new ApiUnavailableError(
+      `The API returned an error while loading skills (status ${skillsResponse.status}).`
+    )
+  }
+
+  const currentLearning: LearningItem[] = learningData.map((item: any) => ({
     id: item.id,
     title: item.title,
     description: item.description,
@@ -40,18 +55,16 @@ export default async function Learning() {
   }))
 
   let completedSkills: LearningItem[] = []
-  if (skillsResponse.ok) {
-    const skillsData = await skillsResponse.json()
-    if (skillsData.success && Array.isArray(skillsData.data)) {
-      completedSkills = skillsData.data.map((skill: any) => ({
-        id: skill.id,
-        title: skill.name,
-        description: skill.description || '',
-        category: skill.category,
-        level: skill.level,
-        completedDate: skill.completed_date || null,
-      }))
-    }
+  const skillsData = await skillsResponse.json()
+  if (skillsData.success && Array.isArray(skillsData.data)) {
+    completedSkills = skillsData.data.map((skill: any) => ({
+      id: skill.id,
+      title: skill.name,
+      description: skill.description || '',
+      category: skill.category,
+      level: skill.level,
+      completedDate: skill.completed_date || null,
+    }))
   }
 
   const learningGoals = [

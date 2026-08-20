@@ -1,6 +1,6 @@
 'use client'
 
-import { Github, Linkedin, Mail, Heart } from 'lucide-react'
+import { Github, Linkedin, Mail, Heart, Download } from 'lucide-react'
 
 const Footer = () => {
   const currentYear = new Date().getFullYear()
@@ -20,6 +20,11 @@ const Footer = () => {
               Full Stack Software Engineer passionate about creating beautiful, innovative solutions
               and building exceptional user experiences. 💖
             </p>
+            <div className="flex items-center gap-2 text-sm font-semibold text-pink-600">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              {/* Edit this line to update availability status */}
+              <span>Open to full-stack roles and freelance work</span>
+            </div>
           </div>
 
           {/* Quick Links */}
@@ -72,6 +77,14 @@ const Footer = () => {
                 <Mail className="w-5 h-5" />
               </a>
             </div>
+            <a
+              href="/resume.pdf"
+              download
+              className="btn-secondary text-sm px-4 py-2"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Download CV
+            </a>
           </div>
         </div>
 

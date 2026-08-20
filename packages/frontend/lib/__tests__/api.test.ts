@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fetchProjects, fetchBlogPosts, fetchLearning } from '../api'
+import { fetchProjects, fetchBlogPosts, fetchLearning, ApiUnavailableError } from '../api'
 
 // Mock fetch globally
 global.fetch = vi.fn()
@@ -25,22 +25,34 @@ describe('API Functions', () => {
 
       expect(result).toEqual(mockProjects)
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/projects')
+        expect.stringContaining('/api/projects'),
+        expect.objectContaining({ cache: 'no-store' })
       )
     })
 
-    it('should return empty array on error', async () => {
+    // Regression test: the backend (Railway) cold-starts when idle. A
+    // network failure must be surfaced to callers (so pages can show a
+    // visible error/retry state) instead of silently looking like "there
+    // are no projects".
+    it('should throw ApiUnavailableError on network error instead of silently returning []', async () => {
       ;(global.fetch as any).mockRejectedValueOnce(new Error('Network error'))
 
-      const result = await fetchProjects()
-
-      expect(result).toEqual([])
+      await expect(fetchProjects()).rejects.toBeInstanceOf(ApiUnavailableError)
     })
 
-    it('should return empty array when response is not ok', async () => {
+    it('should throw ApiUnavailableError when response is not ok instead of silently returning []', async () => {
       ;(global.fetch as any).mockResolvedValueOnce({
         ok: false,
         status: 500,
+      })
+
+      await expect(fetchProjects()).rejects.toBeInstanceOf(ApiUnavailableError)
+    })
+
+    it('should return an empty array when the API genuinely has no projects', async () => {
+      ;(global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: [] }),
       })
 
       const result = await fetchProjects()
@@ -68,6 +80,12 @@ describe('API Functions', () => {
         expect.stringContaining('/api/blog')
       )
     })
+
+    it('should throw ApiUnavailableError on network error', async () => {
+      ;(global.fetch as any).mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(fetchBlogPosts()).rejects.toBeInstanceOf(ApiUnavailableError)
+    })
   })
 
   describe('fetchLearning', () => {
@@ -88,6 +106,11 @@ describe('API Functions', () => {
         expect.stringContaining('/api/learning')
       )
     })
+
+    it('should throw ApiUnavailableError on network error', async () => {
+      ;(global.fetch as any).mockRejectedValueOnce(new Error('Network error'))
+
+      await expect(fetchLearning()).rejects.toBeInstanceOf(ApiUnavailableError)
+    })
   })
 })
-

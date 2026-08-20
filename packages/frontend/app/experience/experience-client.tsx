@@ -85,6 +85,11 @@ export default function ExperienceClient({
             <Briefcase className="w-8 h-8 mr-3 text-pink-600" />
             💼 Professional Experience
           </motion.h2>
+          {workExperience.length === 0 && (
+            <div className="text-center py-10">
+              <p className="text-gray-700 font-medium">No work history available at the moment. Check back soon! ✨</p>
+            </div>
+          )}
           <div className="space-y-8">
             {workExperience.map((job, index) => (
               <motion.div key={job.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card p-6 border-l-4 border-pink-400 hover:scale-105 transition-transform">

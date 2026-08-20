@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import BlogPostClient from './BlogPostClient'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
+import { fetchBlogPostBySlug } from '@/lib/api'
 
 interface PageProps {
   params: {
@@ -9,26 +10,11 @@ interface PageProps {
   }
 }
 
+// Note: throws ApiUnavailableError (caught by the nearest error.tsx) if the
+// backend can't be reached, and only returns null for a genuine 404 - so a
+// sleeping/cold-starting backend no longer looks like a missing blog post.
 async function getBlogPost(slug: string) {
-  try {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
-      ? `${process.env.NEXT_PUBLIC_API_URL}/api` 
-      : 'https://api.demitaylornimmo.com/api'
-    
-    const response = await fetch(`${API_BASE_URL}/blog/${slug}`, {
-      next: { revalidate: 60 } // Revalidate every 60 seconds
-    })
-    
-    if (!response.ok) {
-      return null
-    }
-    
-    const data = await response.json()
-    return data.success ? data.data : null
-  } catch (error) {
-    console.error('Failed to fetch blog post:', error)
-    return null
-  }
+  return fetchBlogPostBySlug(slug)
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

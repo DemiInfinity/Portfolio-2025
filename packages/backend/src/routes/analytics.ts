@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { anonymizeIp } from '../utils/anonymizeIp'
 
 const router = express.Router()
 
@@ -36,7 +37,11 @@ router.post('/track', [
     } = req.body
 
     const user_agent = req.headers['user-agent'] || ''
-    const ip_address = req.ip || req.connection.remoteAddress || '127.0.0.1'
+    // Anonymize before it ever reaches storage: GDPR-relevant for a UK/EU-facing
+    // public endpoint. Zeroes the last IPv4 octet / last 80 bits of IPv6, which
+    // is enough for coarse geo aggregation without identifying an individual.
+    const rawIp = req.ip || req.connection.remoteAddress || '127.0.0.1'
+    const ip_address = anonymizeIp(rawIp)
 
     const { supabaseService } = getServices()
     

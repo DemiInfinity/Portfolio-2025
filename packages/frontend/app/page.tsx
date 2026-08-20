@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { fetchProjects } from '@/lib/api'
+import { fetchProjects, ApiUnavailableError } from '@/lib/api'
 import HomeClient from './home-client'
 
 interface Project {
@@ -19,8 +19,24 @@ export const metadata: Metadata = {
 }
 
 export default async function Home() {
-  const data = await fetchProjects()
-  const projects = data.slice(0, 3) as Project[]
+  // The "Recent Work" widget on the homepage shouldn't take the whole
+  // landing page down if the backend (Railway, cold-starts when idle) is
+  // unreachable - the hero, about and CTA sections should still render.
+  // So this failure is caught here rather than left to bubble to an
+  // error.tsx boundary, and surfaced as a visible inline state instead.
+  let projects: Project[] = []
+  let projectsUnavailable = false
+  try {
+    const data = await fetchProjects()
+    projects = data.slice(0, 3) as Project[]
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) {
+      console.error('Home: projects unavailable', error)
+      projectsUnavailable = true
+    } else {
+      throw error
+    }
+  }
 
-  return <HomeClient projects={projects} />
+  return <HomeClient projects={projects} projectsUnavailable={projectsUnavailable} />
 }

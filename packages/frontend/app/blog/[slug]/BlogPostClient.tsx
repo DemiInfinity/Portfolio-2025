@@ -7,6 +7,8 @@ import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
+import PageLoading from '@/components/PageLoading'
+import PageError from '@/components/PageError'
 
 interface BlogPost {
   id: number
@@ -27,21 +29,38 @@ interface BlogPostClientProps {
   slug: string
 }
 
+type BlogClientErrorKind = 'not-found' | 'unavailable'
+
 export default function BlogPostClient({ slug }: BlogPostClientProps) {
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<BlogClientErrorKind | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
+    let cancelled = false
+
     const loadBlogPost = async () => {
+      setLoading(true)
+      setError(null)
       try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
-          ? `${process.env.NEXT_PUBLIC_API_URL}/api` 
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+          ? `${process.env.NEXT_PUBLIC_API_URL}/api`
           : 'https://api.demitaylornimmo.com/api'
-        
+
         const response = await fetch(`${API_BASE_URL}/blog/${slug}`)
+
+        if (response.status === 404) {
+          if (!cancelled) setError('not-found')
+          return
+        }
+        if (!response.ok) {
+          if (!cancelled) setError('unavailable')
+          return
+        }
+
         const data = await response.json()
-        
+
         if (data.success) {
           // Map backend data to frontend interface
           const mappedPost = {
@@ -58,22 +77,29 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
             slug: data.data.slug,
             coverImage: data.data.cover_image ?? null
           }
-          setPost(mappedPost)
+          if (!cancelled) setPost(mappedPost)
         } else {
-          setError('Blog post not found')
+          if (!cancelled) setError('not-found')
         }
       } catch (error) {
         console.error('Failed to load blog post:', error)
-        setError('Failed to load blog post')
+        // A network-level failure almost always means the backend (Railway,
+        // cold-starts when idle) isn't reachable yet - not that the post
+        // doesn't exist.
+        if (!cancelled) setError('unavailable')
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     if (slug) {
       loadBlogPost()
     }
-  }, [slug])
+
+    return () => {
+      cancelled = true
+    }
+  }, [slug, retryCount])
 
   const getCategoryColor = (category: string) => {
     const colors = {
@@ -86,14 +112,20 @@ export default function BlogPostClient({ slug }: BlogPostClientProps) {
   }
 
   if (loading) {
+    return <PageLoading label="Loading blog post" />
+  }
+
+  if (error === 'unavailable') {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #fdf2f8 0%, #f8f4ff 50%, #fff8f0 100%)' }}>
-        <div className="text-lg font-medium text-gray-700">Loading blog post... ✨</div>
-      </div>
+      <PageError
+        title="Couldn't load this post"
+        message="We couldn't reach the server. It's hosted on Railway and naps when idle, so it may just need a moment to wake up."
+        reset={() => setRetryCount((c) => c + 1)}
+      />
     )
   }
 
-  if (error || !post) {
+  if (error === 'not-found' || !post) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #fdf2f8 0%, #f8f4ff 50%, #fff8f0 100%)' }}>
         <div className="text-center">
