@@ -1,9 +1,10 @@
-import { expect, afterEach, vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import * as matchers from '@testing-library/jest-dom/matchers'
-
-// Extend Vitest's expect with jest-dom matchers
-expect.extend(matchers)
+// This subpath (rather than '@testing-library/jest-dom/matchers') both
+// registers the matchers on Vitest's `expect` and augments Vitest's
+// `Assertion` type - importing '/matchers' alone leaves `expect(...).toBeInTheDocument()`
+// working at runtime but failing `tsc`, which is what broke the production build.
+import '@testing-library/jest-dom/vitest'
 
 // Cleanup after each test
 afterEach(() => {
