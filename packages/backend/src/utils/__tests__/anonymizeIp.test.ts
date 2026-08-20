@@ -13,8 +13,12 @@ describe('anonymizeIp', () => {
     expect(anonymizeIp('10.0.0.0')).toBe('10.0.0.0')
   })
 
-  it('treats an IPv4-mapped IPv6 address as IPv4', () => {
+  it('treats a compressed IPv4-mapped IPv6 address as IPv4', () => {
     expect(anonymizeIp('::ffff:203.0.113.45')).toBe('203.0.113.0')
+  })
+
+  it('treats an uncompressed IPv4-mapped IPv6 address as IPv4', () => {
+    expect(anonymizeIp('0:0:0:0:0:ffff:203.0.113.45')).toBe('203.0.113.0')
   })
 
   it('keeps the first 48 bits and zeroes the rest of a full IPv6 address', () => {
@@ -40,7 +44,7 @@ describe('anonymizeIp', () => {
     expect(anonymizeIp(undefined)).toBe('')
   })
 
-  it('returns unrecognized input unchanged rather than throwing', () => {
-    expect(anonymizeIp('not-an-ip')).toBe('not-an-ip')
+  it('fails closed on unrecognized input rather than storing it raw', () => {
+    expect(anonymizeIp('not-an-ip')).toBe('0.0.0.0')
   })
 })

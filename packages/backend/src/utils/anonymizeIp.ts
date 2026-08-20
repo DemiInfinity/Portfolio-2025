@@ -11,8 +11,9 @@
  * precision survives for coarse geographic aggregation, but the result no
  * longer identifies an individual visitor.
  *
- * Unrecognized input is returned unchanged rather than silently discarded,
- * so callers can decide whether to store/log it further.
+ * Unrecognized input is discarded (a sentinel is returned instead) rather
+ * than stored as-is - for a control whose entire purpose is GDPR
+ * compliance, an unrecognized format must fail closed, not fail open.
  */
 export function anonymizeIp(ip: string | undefined | null): string {
   if (!ip) return ip ?? ''
@@ -22,10 +23,14 @@ export function anonymizeIp(ip: string | undefined | null): string {
   // Strip an IPv6 zone id if present (e.g. fe80::1%eth0)
   addr = addr.split('%')[0]
 
-  // IPv4-mapped IPv6 address, e.g. ::ffff:203.0.113.45
-  const mappedMatch = addr.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i)
-  if (mappedMatch) {
-    addr = mappedMatch[1]
+  // IPv4-mapped/compatible IPv6 address, e.g. ::ffff:203.0.113.45 or the
+  // uncompressed 0:0:0:0:0:ffff:203.0.113.45 - either way, if it's an IPv6
+  // address ending in a dotted-quad, treat the dotted-quad as the real IPv4.
+  if (addr.includes(':')) {
+    const trailingIpv4 = addr.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+    if (trailingIpv4) {
+      addr = trailingIpv4[1]
+    }
   }
 
   // IPv4
@@ -43,8 +48,10 @@ export function anonymizeIp(ip: string | undefined | null): string {
     }
   }
 
-  // Unrecognized format - leave untouched rather than corrupting the value.
-  return ip
+  // Unrecognized format - fail closed rather than storing a raw, possibly
+  // attacker-controlled (X-Forwarded-For is client-supplied) value.
+  console.warn(`anonymizeIp: unrecognized IP format, discarding value`)
+  return '0.0.0.0'
 }
 
 /** Expands a possibly-compressed IPv6 address into 8 hextets, or null if malformed. */

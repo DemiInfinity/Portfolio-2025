@@ -82,8 +82,8 @@ router.get('/:slug', async (req: Request, res: Response) => {
       .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, cover_image')
       .eq('slug', slug)
       .eq('published', true)
-      .single()
-    
+      .maybeSingle()
+
     if (error) throw error
 
     if (!post) {

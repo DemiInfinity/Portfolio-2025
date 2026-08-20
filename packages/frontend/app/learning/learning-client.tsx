@@ -19,12 +19,14 @@ interface LearningItem {
 interface LearningClientProps {
   currentLearning: LearningItem[]
   completedSkills: LearningItem[]
+  skillsUnavailable?: boolean
   learningGoals: string[]
 }
 
 export default function LearningClient({
   currentLearning,
   completedSkills,
+  skillsUnavailable = false,
   learningGoals,
 }: LearningClientProps) {
   return (
@@ -186,7 +188,16 @@ export default function LearningClient({
           </div>
         </section>
 
-        {/* Completed Skills - Only show if there are completed skills */}
+        {/* Completed Skills - show an inline notice if this section failed to load */}
+        {skillsUnavailable && (
+          <section className="mb-16">
+            <div className="card p-6 text-center">
+              <p className="text-gray-600 font-medium">
+                Couldn't load completed skills right now - the rest of the page is unaffected. 😔
+              </p>
+            </div>
+          </section>
+        )}
         {completedSkills.length > 0 && (
           <section className="mb-16">
             <motion.h2

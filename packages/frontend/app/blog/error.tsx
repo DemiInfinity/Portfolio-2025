@@ -17,7 +17,7 @@ export default function Error({
   return (
     <PageError
       title="Couldn't load the blog"
-      message="We couldn't reach the server to load blog posts. It's hosted on Railway and naps when idle, so it may just need a moment to wake up - try again in a few seconds."
+      message="We couldn't reach the server to load this blog content. It's hosted on Railway and naps when idle, so it may just need a moment to wake up - try again in a few seconds."
       reset={reset}
     />
   )

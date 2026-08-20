@@ -37,8 +37,22 @@ async function fetchList<T>(url: string, description: string, init?: RequestInit
       `The API returned an error while loading ${description} (status ${response.status}).`
     )
   }
-  const data = await response.json()
-  return (data.data ?? []) as T[]
+  try {
+    const data = await response.json()
+    if (data.success === false) {
+      throw new ApiUnavailableError(
+        `The API reported a failure while loading ${description}: ${data.error ?? 'unknown error'}.`
+      )
+    }
+    return (data.data ?? []) as T[]
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) throw error
+    console.error(`Error parsing response for ${description}:`, error)
+    throw new ApiUnavailableError(
+      `The API returned an unexpected response while loading ${description}.`,
+      { cause: error }
+    )
+  }
 }
 
 async function fetchSingle<T>(url: string, description: string, init?: RequestInit): Promise<T | null> {
@@ -62,8 +76,22 @@ async function fetchSingle<T>(url: string, description: string, init?: RequestIn
       `The API returned an error while loading ${description} (status ${response.status}).`
     )
   }
-  const data = await response.json()
-  return (data.data ?? null) as T | null
+  try {
+    const data = await response.json()
+    if (data.success === false) {
+      throw new ApiUnavailableError(
+        `The API reported a failure while loading ${description}: ${data.error ?? 'unknown error'}.`
+      )
+    }
+    return (data.data ?? null) as T | null
+  } catch (error) {
+    if (error instanceof ApiUnavailableError) throw error
+    console.error(`Error parsing response for ${description}:`, error)
+    throw new ApiUnavailableError(
+      `The API returned an unexpected response while loading ${description}.`,
+      { cause: error }
+    )
+  }
 }
 
 export async function fetchProjects() {

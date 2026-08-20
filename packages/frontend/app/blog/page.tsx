@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   title: 'Blog',
 }
 
+// The backend cold-starts when idle, so this page must render per-request
+// (not be statically prerendered at build time) or a build-time backend
+// hiccup would fail the whole deploy instead of showing error.tsx.
+export const dynamic = 'force-dynamic'
+
 export default async function Blog() {
   const data = await fetchBlogPosts()
   const blogPosts: BlogPost[] = data.map((post: any) => ({

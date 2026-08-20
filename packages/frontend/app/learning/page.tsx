@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { fetchLearning, ApiUnavailableError } from '@/lib/api'
+import { fetchLearning } from '@/lib/api'
 import LearningClient from './learning-client'
 
 interface LearningItem {
@@ -24,24 +24,10 @@ export default async function Learning() {
     ? `${process.env.NEXT_PUBLIC_API_URL}/api`
     : 'https://api.demitaylornimmo.com/api'
 
-  let skillsResponse: Response
-  let learningData: any[]
-  try {
-    ;[learningData, skillsResponse] = await Promise.all([
-      // Throws ApiUnavailableError on failure - let it bubble to error.tsx.
-      fetchLearning(),
-      fetch(`${API_BASE_URL}/skills`, { cache: 'no-store' }),
-    ])
-  } catch (error) {
-    if (error instanceof ApiUnavailableError) throw error
-    throw new ApiUnavailableError('Unable to reach the API to load skills.', { cause: error })
-  }
-
-  if (!skillsResponse.ok) {
-    throw new ApiUnavailableError(
-      `The API returned an error while loading skills (status ${skillsResponse.status}).`
-    )
-  }
+  // The main learning items are the page's core content - a failure there
+  // should bubble to error.tsx. Completed skills are a secondary section,
+  // so a failure there degrades gracefully instead of blanking the page.
+  const learningData = await fetchLearning()
 
   const currentLearning: LearningItem[] = learningData.map((item: any) => ({
     id: item.id,
@@ -55,16 +41,29 @@ export default async function Learning() {
   }))
 
   let completedSkills: LearningItem[] = []
-  const skillsData = await skillsResponse.json()
-  if (skillsData.success && Array.isArray(skillsData.data)) {
-    completedSkills = skillsData.data.map((skill: any) => ({
-      id: skill.id,
-      title: skill.name,
-      description: skill.description || '',
-      category: skill.category,
-      level: skill.level,
-      completedDate: skill.completed_date || null,
-    }))
+  let skillsUnavailable = false
+  try {
+    const skillsResponse = await fetch(`${API_BASE_URL}/skills`, { cache: 'no-store' })
+    if (skillsResponse.ok) {
+      const skillsData = await skillsResponse.json()
+      if (skillsData.success && Array.isArray(skillsData.data)) {
+        completedSkills = skillsData.data.map((skill: any) => ({
+          id: skill.id,
+          title: skill.name,
+          description: skill.description || '',
+          category: skill.category,
+          level: skill.level,
+          completedDate: skill.completed_date || null,
+        }))
+      } else {
+        skillsUnavailable = true
+      }
+    } else {
+      skillsUnavailable = true
+    }
+  } catch (error) {
+    console.error('Error fetching skills:', error)
+    skillsUnavailable = true
   }
 
   const learningGoals = [
@@ -78,6 +77,7 @@ export default async function Learning() {
     <LearningClient
       currentLearning={currentLearning}
       completedSkills={completedSkills}
+      skillsUnavailable={skillsUnavailable}
       learningGoals={learningGoals}
     />
   )
