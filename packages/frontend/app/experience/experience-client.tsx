@@ -92,7 +92,7 @@ export default function ExperienceClient({
           )}
           <div className="space-y-8">
             {workExperience.map((job, index) => (
-              <motion.div key={job.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card p-6 border-l-4 border-pink-400 hover:scale-105 transition-transform">
+              <motion.div key={job.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card p-6 border-l-4 border-l-pink-400 hover:scale-105 transition-transform">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4">
                   <div className="flex-1">
                     <div className="flex items-center mb-2">
