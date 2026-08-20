@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
@@ -45,33 +45,36 @@ const Projects = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: projects, isLoading } = useQuery('projects', async () => {
-    const response = await api.get('/projects')
-    const projectsData = response.data.data as any[]
-    // Ensure technologies is always an array
-    return projectsData.map((project: any) => {
-      let technologies: string[] = []
-      const techValue = project.technologies
-      
-      if (Array.isArray(techValue)) {
-        technologies = techValue
-      } else if (typeof techValue === 'string') {
-        try {
-          if (techValue.startsWith('[')) {
-            technologies = JSON.parse(techValue)
-          } else {
-            technologies = techValue.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
+  const { data: projects, isLoading } = useQuery({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const response = await api.get('/projects')
+      const projectsData = response.data.data as any[]
+      // Ensure technologies is always an array
+      return projectsData.map((project: any) => {
+        let technologies: string[] = []
+        const techValue = project.technologies
+
+        if (Array.isArray(techValue)) {
+          technologies = techValue
+        } else if (typeof techValue === 'string') {
+          try {
+            if (techValue.startsWith('[')) {
+              technologies = JSON.parse(techValue)
+            } else {
+              technologies = techValue.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
+            }
+          } catch {
+            technologies = []
           }
-        } catch {
-          technologies = []
         }
-      }
-      
-      return {
-        ...project,
-        technologies
-      } as Project
-    })
+
+        return {
+          ...project,
+          technologies
+        } as Project
+      })
+    }
   })
 
   const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<ProjectForm>()
@@ -91,60 +94,54 @@ const Projects = () => {
     }
   }
 
-  const createMutation = useMutation(
-    (data: ProjectForm) => api.post('/projects', {
+  const createMutation = useMutation({
+    mutationFn: (data: ProjectForm) => api.post('/projects', {
       ...data,
       technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
       images: data.images
         ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
         : []
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('projects')
-        toast.success('Project created successfully')
-        setIsModalOpen(false)
-        reset()
-      },
-      onError: (error: any) => {
-        console.error('Create error:', error)
-        toast.error(error.response?.data?.error || 'Failed to create project')
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project created successfully')
+      setIsModalOpen(false)
+      reset()
+    },
+    onError: (error: any) => {
+      console.error('Create error:', error)
+      toast.error(error.response?.data?.error || 'Failed to create project')
     }
-  )
+  })
 
-  const updateMutation = useMutation(
-    ({ id, data }: { id: number, data: ProjectForm }) => api.put(`/projects/${id}`, {
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: ProjectForm }) => api.put(`/projects/${id}`, {
       ...data,
       technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
       images: data.images
         ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
         : []
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('projects')
-        toast.success('Project updated successfully')
-        setIsModalOpen(false)
-        setEditingProject(null)
-        reset()
-      },
-      onError: (error: any) => {
-        console.error('Update error:', error)
-        toast.error(error.response?.data?.error || 'Failed to update project')
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project updated successfully')
+      setIsModalOpen(false)
+      setEditingProject(null)
+      reset()
+    },
+    onError: (error: any) => {
+      console.error('Update error:', error)
+      toast.error(error.response?.data?.error || 'Failed to update project')
     }
-  )
+  })
 
-  const deleteMutation = useMutation(
-    (id: number) => api.delete(`/projects/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('projects')
-        toast.success('Project deleted successfully')
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/projects/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Project deleted successfully')
     }
-  )
+  })
 
   const onSubmit = (data: ProjectForm) => {
     if (editingProject) {
@@ -554,10 +551,10 @@ const Projects = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={createMutation.isLoading || updateMutation.isLoading}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="btn-success"
                   >
-                    {createMutation.isLoading || updateMutation.isLoading ? (
+                    {createMutation.isPending || updateMutation.isPending ? (
                       <div className="flex items-center">
                         <div className="spinner w-4 h-4 mr-2"></div>
                         Saving...

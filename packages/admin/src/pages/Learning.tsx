@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, BookOpen, Award } from 'lucide-react'
@@ -49,103 +49,97 @@ const Learning = () => {
   const [editingItem, setEditingItem] = useState<LearningItem | Skill | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: learning, isLoading: learningLoading } = useQuery('learning', async () => {
-    const response = await api.get('/learning')
-    return response.data.data as LearningItem[]
+  const { data: learning, isLoading: learningLoading } = useQuery({
+    queryKey: ['learning'],
+    queryFn: async () => {
+      const response = await api.get('/learning')
+      return response.data.data as LearningItem[]
+    }
   })
 
-  const { data: skills, isLoading: skillsLoading } = useQuery('skills', async () => {
-    const response = await api.get('/skills')
-    return response.data.data as Skill[]
+  const { data: skills, isLoading: skillsLoading } = useQuery({
+    queryKey: ['skills'],
+    queryFn: async () => {
+      const response = await api.get('/skills')
+      return response.data.data as Skill[]
+    }
   })
 
   const { register: registerLearning, handleSubmit: handleLearningSubmit, reset: resetLearning, formState: { errors: learningErrors } } = useForm<LearningForm>()
   const { register: registerSkill, handleSubmit: handleSkillSubmit, reset: resetSkill, formState: { errors: skillErrors } } = useForm<SkillForm>()
 
-  const createLearningMutation = useMutation(
-    (data: LearningForm) => api.post('/learning', {
+  const createLearningMutation = useMutation({
+    mutationFn: (data: LearningForm) => api.post('/learning', {
       ...data,
       resources: data.resources.split(',').map(r => r.trim()).filter(r => r)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('learning')
-        toast.success('Learning item created successfully')
-        setIsModalOpen(false)
-        resetLearning()
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['learning'] })
+      toast.success('Learning item created successfully')
+      setIsModalOpen(false)
+      resetLearning()
     }
-  )
+  })
 
-  const createSkillMutation = useMutation(
-    (data: SkillForm) => api.post('/skills', data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('skills')
-        toast.success('Skill added successfully')
-        setIsModalOpen(false)
-        resetSkill()
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to create skill')
-      }
+  const createSkillMutation = useMutation({
+    mutationFn: (data: SkillForm) => api.post('/skills', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
+      toast.success('Skill added successfully')
+      setIsModalOpen(false)
+      resetSkill()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to create skill')
     }
-  )
+  })
 
-  const updateLearningMutation = useMutation(
-    ({ id, data }: { id: number, data: LearningForm }) => api.put(`/learning/${id}`, {
+  const updateLearningMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: LearningForm }) => api.put(`/learning/${id}`, {
       ...data,
       resources: data.resources.split(',').map(r => r.trim()).filter(r => r)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('learning')
-        toast.success('Learning item updated successfully')
-        setIsModalOpen(false)
-        setEditingItem(null)
-        resetLearning()
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['learning'] })
+      toast.success('Learning item updated successfully')
+      setIsModalOpen(false)
+      setEditingItem(null)
+      resetLearning()
     }
-  )
+  })
 
-  const deleteLearningMutation = useMutation(
-    (id: number) => api.delete(`/learning/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('learning')
-        toast.success('Learning item deleted successfully')
-      }
+  const deleteLearningMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/learning/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['learning'] })
+      toast.success('Learning item deleted successfully')
     }
-  )
+  })
 
-  const updateSkillMutation = useMutation(
-    ({ id, data }: { id: number, data: SkillForm }) => api.put(`/skills/${id}`, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('skills')
-        toast.success('Skill updated successfully')
-        setIsModalOpen(false)
-        setEditingItem(null)
-        resetSkill()
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to update skill')
-      }
+  const updateSkillMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: SkillForm }) => api.put(`/skills/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
+      toast.success('Skill updated successfully')
+      setIsModalOpen(false)
+      setEditingItem(null)
+      resetSkill()
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to update skill')
     }
-  )
+  })
 
-  const deleteSkillMutation = useMutation(
-    (id: number) => api.delete(`/skills/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('skills')
-        toast.success('Skill deleted successfully')
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to delete skill')
-      }
+  const deleteSkillMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/skills/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skills'] })
+      toast.success('Skill deleted successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to delete skill')
     }
-  )
+  })
 
   const openModal = (item?: LearningItem | Skill, type: 'learning' | 'skill' = activeTab === 'learning' ? 'learning' : 'skill') => {
     if (item && type === 'learning') {
@@ -507,10 +501,10 @@ const Learning = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={createLearningMutation.isLoading || updateLearningMutation.isLoading}
+                      disabled={createLearningMutation.isPending || updateLearningMutation.isPending}
                       className="btn-success"
                     >
-                      {createLearningMutation.isLoading || updateLearningMutation.isLoading ? (
+                      {createLearningMutation.isPending || updateLearningMutation.isPending ? (
                         <div className="flex items-center">
                           <div className="spinner w-4 h-4 mr-2"></div>
                           Saving...
@@ -585,10 +579,10 @@ const Learning = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={createSkillMutation.isLoading || updateSkillMutation.isLoading}
+                      disabled={createSkillMutation.isPending || updateSkillMutation.isPending}
                       className="btn-success"
                     >
-                      {createSkillMutation.isLoading || updateSkillMutation.isLoading ? (
+                      {createSkillMutation.isPending || updateSkillMutation.isPending ? (
                         <div className="flex items-center">
                           <div className="spinner w-4 h-4 mr-2"></div>
                           Saving...

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation } from 'react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
@@ -59,34 +59,30 @@ const Settings = () => {
 
   const { register: registerPassword, handleSubmit: handlePasswordSubmit, reset: resetPassword, watch, formState: { errors: passwordErrors } } = useForm<PasswordForm>()
 
-  const updateProfileMutation = useMutation(
-    (data: ProfileForm) => api.put('/auth/profile', data),
-    {
-      onSuccess: async () => {
-        toast.success('Profile updated successfully')
-        // Refresh user data
-        await refreshUser()
-      },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Failed to update profile'
-        toast.error(message)
-      }
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: ProfileForm) => api.put('/auth/profile', data),
+    onSuccess: async () => {
+      toast.success('Profile updated successfully')
+      // Refresh user data
+      await refreshUser()
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || 'Failed to update profile'
+      toast.error(message)
     }
-  )
+  })
 
-  const changePasswordMutation = useMutation(
-    (data: { currentPassword: string, newPassword: string }) => api.put('/auth/change-password', data),
-    {
-      onSuccess: () => {
-        toast.success('Password changed successfully')
-        resetPassword()
-      },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Failed to change password'
-        toast.error(message)
-      }
+  const changePasswordMutation = useMutation({
+    mutationFn: (data: { currentPassword: string, newPassword: string }) => api.put('/auth/change-password', data),
+    onSuccess: () => {
+      toast.success('Password changed successfully')
+      resetPassword()
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || 'Failed to change password'
+      toast.error(message)
     }
-  )
+  })
 
   const onProfileSubmit = (data: ProfileForm) => {
     updateProfileMutation.mutate(data)
@@ -190,11 +186,11 @@ const Settings = () => {
             <div className="bg-gradient-to-r from-pink-50 to-purple-50 px-6 py-4 rounded-b-xl text-right">
               <button
                 type="submit"
-                disabled={updateProfileMutation.isLoading}
+                disabled={updateProfileMutation.isPending}
                 className="btn-success floating-hearts"
               >
                 <Save className="w-5 h-5 mr-2" />
-                {updateProfileMutation.isLoading ? '💾 Saving...' : '💾 Save Changes'}
+                {updateProfileMutation.isPending ? '💾 Saving...' : '💾 Save Changes'}
               </button>
             </div>
           </form>
@@ -269,11 +265,11 @@ const Settings = () => {
             <div className="bg-gradient-to-r from-pink-50 to-purple-50 px-6 py-4 rounded-b-xl text-right">
               <button
                 type="submit"
-                disabled={changePasswordMutation.isLoading}
+                disabled={changePasswordMutation.isPending}
                 className="btn-success floating-hearts"
               >
                 <Lock className="w-5 h-5 mr-2" />
-                {changePasswordMutation.isLoading ? '🔄 Changing...' : '🔒 Change Password'}
+                {changePasswordMutation.isPending ? '🔄 Changing...' : '🔒 Change Password'}
               </button>
             </div>
           </form>

@@ -1,4 +1,4 @@
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { BarChart3, Users, Eye, Clock, Globe } from 'lucide-react'
 
@@ -21,9 +21,12 @@ interface AnalyticsOverview {
 }
 
 const Analytics = () => {
-  const { data: analytics, isLoading } = useQuery('analytics-overview', async () => {
-    const response = await api.get('/analytics/overview')
-    return response.data.data as AnalyticsOverview
+  const { data: analytics, isLoading } = useQuery({
+    queryKey: ['analytics-overview'],
+    queryFn: async () => {
+      const response = await api.get('/analytics/overview')
+      return response.data.data as AnalyticsOverview
+    }
   })
 
   const formatDuration = (seconds: number) => {

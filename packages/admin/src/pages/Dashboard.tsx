@@ -1,26 +1,29 @@
-import { useQuery } from 'react-query'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Users, FileText, Briefcase, BookOpen, GraduationCap, Award } from 'lucide-react'
 
 const Dashboard = () => {
-  const { data: stats } = useQuery('dashboard-stats', async () => {
-    const [projects, learning, blog, workHistory, education, certifications] = await Promise.all([
-      api.get('/projects'),
-      api.get('/learning'),
-      api.get('/blog/admin/all'),
-      api.get('/work-history'),
-      api.get('/education'),
-      api.get('/certifications')
-    ])
-    
-    return {
-      projects: projects.data.data.length,
-      learning: learning.data.data.length,
-      blogPosts: blog.data.data.length,
-      workHistory: workHistory.data.data.length,
-      education: education.data.data.length,
-      certifications: certifications.data.data.length,
-      publishedPosts: blog.data.data.filter((post: any) => post.published).length
+  const { data: stats } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const [projects, learning, blog, workHistory, education, certifications] = await Promise.all([
+        api.get('/projects'),
+        api.get('/learning'),
+        api.get('/blog/admin/all'),
+        api.get('/work-history'),
+        api.get('/education'),
+        api.get('/certifications')
+      ])
+
+      return {
+        projects: projects.data.data.length,
+        learning: learning.data.data.length,
+        blogPosts: blog.data.data.length,
+        workHistory: workHistory.data.data.length,
+        education: education.data.data.length,
+        certifications: certifications.data.data.length,
+        publishedPosts: blog.data.data.filter((post: any) => post.published).length
+      }
     }
   })
 

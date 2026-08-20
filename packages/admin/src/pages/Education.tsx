@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, GraduationCap, Calendar, MapPin } from 'lucide-react'
@@ -37,9 +37,12 @@ const Education = () => {
   const [achievements, setAchievements] = useState<string[]>([])
   const queryClient = useQueryClient()
 
-  const { data: education, isLoading } = useQuery('education', async () => {
-    const response = await api.get('/education')
-    return response.data.data as Education[]
+  const { data: education, isLoading } = useQuery({
+    queryKey: ['education'],
+    queryFn: async () => {
+      const response = await api.get('/education')
+      return response.data.data as Education[]
+    }
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EducationForm>({
@@ -48,51 +51,45 @@ const Education = () => {
     }
   })
 
-  const createMutation = useMutation(
-    (data: EducationForm) => api.post('/education', data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('education')
-        toast.success('Education entry created successfully')
-        setIsModalOpen(false)
-        reset()
-        setAchievements([])
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to create education entry')
-      }
+  const createMutation = useMutation({
+    mutationFn: (data: EducationForm) => api.post('/education', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['education'] })
+      toast.success('Education entry created successfully')
+      setIsModalOpen(false)
+      reset()
+      setAchievements([])
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to create education entry')
     }
-  )
+  })
 
-  const updateMutation = useMutation(
-    ({ id, data }: { id: number, data: EducationForm }) => api.put(`/education/${id}`, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('education')
-        toast.success('Education entry updated successfully')
-        setIsModalOpen(false)
-        setEditingEducation(null)
-        reset()
-        setAchievements([])
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to update education entry')
-      }
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: EducationForm }) => api.put(`/education/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['education'] })
+      toast.success('Education entry updated successfully')
+      setIsModalOpen(false)
+      setEditingEducation(null)
+      reset()
+      setAchievements([])
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to update education entry')
     }
-  )
+  })
 
-  const deleteMutation = useMutation(
-    (id: number) => api.delete(`/education/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('education')
-        toast.success('Education entry deleted successfully')
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.error || 'Failed to delete education entry')
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/education/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['education'] })
+      toast.success('Education entry deleted successfully')
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to delete education entry')
     }
-  )
+  })
 
   const onSubmit = (data: EducationForm) => {
     const submitData = {
@@ -435,10 +432,10 @@ const Education = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={createMutation.isLoading || updateMutation.isLoading}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="btn-success"
                   >
-                    {createMutation.isLoading || updateMutation.isLoading ? (
+                    {createMutation.isPending || updateMutation.isPending ? (
                       <div className="flex items-center">
                         <div className="spinner w-4 h-4 mr-2"></div>
                         Saving...

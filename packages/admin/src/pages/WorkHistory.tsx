@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2 } from 'lucide-react'
@@ -35,56 +35,53 @@ const WorkHistory = () => {
   const [editingItem, setEditingItem] = useState<WorkHistoryItem | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: workHistory, isLoading: workLoading } = useQuery('work-history', async () => {
-    const response = await api.get('/work-history')
-    return response.data.data as WorkHistoryItem[]
+  const { data: workHistory, isLoading: workLoading } = useQuery({
+    queryKey: ['work-history'],
+    queryFn: async () => {
+      const response = await api.get('/work-history')
+      return response.data.data as WorkHistoryItem[]
+    }
   })
 
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<WorkHistoryForm>()
 
-  const createMutation = useMutation(
-    (data: WorkHistoryForm) => api.post('/work-history', {
+  const createMutation = useMutation({
+    mutationFn: (data: WorkHistoryForm) => api.post('/work-history', {
       ...data,
       achievements: data.achievements.split('\n').filter(a => a.trim()),
       technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('work-history')
-        toast.success('Work history created successfully')
-        setIsModalOpen(false)
-        reset()
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-history'] })
+      toast.success('Work history created successfully')
+      setIsModalOpen(false)
+      reset()
     }
-  )
+  })
 
-  const updateMutation = useMutation(
-    ({ id, data }: { id: number, data: WorkHistoryForm }) => api.put(`/work-history/${id}`, {
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: WorkHistoryForm }) => api.put(`/work-history/${id}`, {
       ...data,
       achievements: data.achievements.split('\n').filter(a => a.trim()),
       technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('work-history')
-        toast.success('Work history updated successfully')
-        setIsModalOpen(false)
-        setEditingItem(null)
-        reset()
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-history'] })
+      toast.success('Work history updated successfully')
+      setIsModalOpen(false)
+      setEditingItem(null)
+      reset()
     }
-  )
+  })
 
-  const deleteMutation = useMutation(
-    (id: number) => api.delete(`/work-history/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('work-history')
-        toast.success('Work history deleted successfully')
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/work-history/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-history'] })
+      toast.success('Work history deleted successfully')
     }
-  )
+  })
 
   const onSubmit = (data: WorkHistoryForm) => {
     if (editingItem) {
@@ -331,10 +328,10 @@ const WorkHistory = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={createMutation.isLoading || updateMutation.isLoading}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="btn-success"
                   >
-                    {createMutation.isLoading || updateMutation.isLoading ? (
+                    {createMutation.isPending || updateMutation.isPending ? (
                       <div className="flex items-center">
                         <div className="spinner w-4 h-4 mr-2"></div>
                         Saving...

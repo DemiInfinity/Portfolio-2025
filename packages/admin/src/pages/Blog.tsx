@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from 'react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
 import { Plus, Edit, Trash2, Eye } from 'lucide-react'
@@ -42,65 +42,62 @@ const Blog = () => {
   const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: posts, isLoading } = useQuery('blog-posts', async () => {
-    const response = await api.get('/blog/admin/all')
-    return response.data.data as BlogPost[]
+  const { data: posts, isLoading } = useQuery({
+    queryKey: ['blog-posts'],
+    queryFn: async () => {
+      const response = await api.get('/blog/admin/all')
+      return response.data.data as BlogPost[]
+    }
   })
 
   const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<BlogForm>()
 
-  const createMutation = useMutation(
-    (data: BlogForm) => api.post('/blog', {
+  const createMutation = useMutation({
+    mutationFn: (data: BlogForm) => api.post('/blog', {
       ...data,
       tags: data.tags.split(',').map(t => t.trim()).filter(t => t)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('blog-posts')
-        toast.success('Blog post created successfully')
-        setIsModalOpen(false)
-        reset()
-      },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Failed to create blog post'
-        toast.error(message)
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+      toast.success('Blog post created successfully')
+      setIsModalOpen(false)
+      reset()
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || 'Failed to create blog post'
+      toast.error(message)
     }
-  )
+  })
 
-  const updateMutation = useMutation(
-    ({ id, data }: { id: number, data: BlogForm }) => api.put(`/blog/${id}`, {
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number, data: BlogForm }) => api.put(`/blog/${id}`, {
       ...data,
       tags: data.tags.split(',').map(t => t.trim()).filter(t => t)
     }),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('blog-posts')
-        toast.success('Blog post updated successfully')
-        setIsModalOpen(false)
-        setEditingPost(null)
-        reset()
-      },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Failed to update blog post'
-        toast.error(message)
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+      toast.success('Blog post updated successfully')
+      setIsModalOpen(false)
+      setEditingPost(null)
+      reset()
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || 'Failed to update blog post'
+      toast.error(message)
     }
-  )
+  })
 
-  const deleteMutation = useMutation(
-    (id: number) => api.delete(`/blog/${id}`),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('blog-posts')
-        toast.success('Blog post deleted successfully')
-      },
-      onError: (error: any) => {
-        const message = error.response?.data?.error || 'Failed to delete blog post'
-        toast.error(message)
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/blog/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
+      toast.success('Blog post deleted successfully')
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || 'Failed to delete blog post'
+      toast.error(message)
     }
-  )
+  })
 
   const onSubmit = (data: BlogForm) => {
     if (editingPost) {
@@ -474,10 +471,10 @@ const Blog = () => {
                   </button>
                   <button
                     type="submit"
-                    disabled={createMutation.isLoading || updateMutation.isLoading}
+                    disabled={createMutation.isPending || updateMutation.isPending}
                     className="btn-success"
                   >
-                    {createMutation.isLoading || updateMutation.isLoading ? (
+                    {createMutation.isPending || updateMutation.isPending ? (
                       <div className="flex items-center">
                         <div className="spinner w-4 h-4 mr-2"></div>
                         Saving...
