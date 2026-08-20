@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Github, ExternalLink, Calendar, ArrowRight } from 'lucide-react'
+import { ExternalLink, Calendar, ArrowRight } from 'lucide-react'
+import { GithubIcon } from '@/components/BrandIcons'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 import Link from 'next/link'
 
@@ -147,7 +148,7 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                         <Link href={`/projects/${project.slug || project.id}`} className="p-2 bg-white/80 hover:bg-pink-100 rounded-full transition-colors" aria-label={`View details for ${project.title}`}>
                           <ArrowRight className="w-5 h-5 text-gray-600 hover:text-pink-600" />
                         </Link>
-                        {project.github_url && <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-100 hover:bg-pink-100 rounded-full transition-colors"><Github className="w-5 h-5 text-gray-600 hover:text-pink-600" /></a>}
+                        {project.github_url && <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-100 hover:bg-pink-100 rounded-full transition-colors"><GithubIcon className="w-5 h-5 text-gray-600 hover:text-pink-600" /></a>}
                         {project.live_url && <a href={project.live_url} target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-100 hover:bg-pink-100 rounded-full transition-colors"><ExternalLink className="w-5 h-5 text-gray-600 hover:text-pink-600" /></a>}
                       </div>
                     </div>
@@ -195,7 +196,7 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                     </div>
                     <div className="flex space-x-3">
                       <Link href={`/projects/${project.slug || project.id}`} className="btn-secondary text-xs px-3 py-1">Details ✨</Link>
-                      {project.github_url && <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs px-3 py-1"><Github className="w-3 h-3 mr-1" />Code 💻</a>}
+                      {project.github_url && <a href={project.github_url} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs px-3 py-1"><GithubIcon className="w-3 h-3 mr-1" />Code 💻</a>}
                       {project.live_url && <a href={project.live_url} target="_blank" rel="noopener noreferrer" className="btn-primary text-xs px-3 py-1"><ExternalLink className="w-3 h-3 mr-1" />Demo ✨</a>}
                     </div>
                   </div>

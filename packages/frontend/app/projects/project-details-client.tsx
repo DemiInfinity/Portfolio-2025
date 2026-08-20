@@ -2,7 +2,8 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, ExternalLink, Github, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Calendar, ExternalLink, Image as ImageIcon } from 'lucide-react'
+import { GithubIcon } from '@/components/BrandIcons'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
@@ -99,7 +100,7 @@ export default function ProjectDetailsClient({ project }: { project: Project }) 
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-4 py-2 bg-white/70 hover:bg-white rounded-lg border border-pink-200 text-gray-800 font-semibold transition-colors"
                   >
-                    <Github className="w-4 h-4" />
+                    <GithubIcon className="w-4 h-4" />
                     Code
                   </a>
                 ) : null}

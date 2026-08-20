@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { useForm } from 'react-hook-form'
 import { api } from '@/lib/api'
-import { Plus, Edit, Trash2, ExternalLink, Github } from 'lucide-react'
+import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ImageUploadButton } from '@/components/ImageUploadButton'
+import { GithubIcon } from '@/components/BrandIcons'
 
 interface Project {
   id: number
@@ -333,7 +334,7 @@ const Projects = () => {
                       rel="noopener noreferrer"
                       className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-pink-100 hover:text-pink-600 transition-colors"
                     >
-                      <Github className="w-4 h-4" />
+                      <GithubIcon className="w-4 h-4" />
                     </a>
                   )}
                   {project.live_url && (

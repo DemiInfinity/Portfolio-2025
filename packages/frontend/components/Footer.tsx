@@ -1,6 +1,7 @@
 'use client'
 
-import { Github, Linkedin, Mail, Heart, Download } from 'lucide-react'
+import { Mail, Heart, Download } from 'lucide-react'
+import { GithubIcon, LinkedinIcon } from './BrandIcons'
 
 const Footer = () => {
   const currentYear = new Date().getFullYear()
@@ -60,7 +61,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="p-2 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 text-white hover:scale-110 transition-transform"
               >
-                <Github className="w-5 h-5" />
+                <GithubIcon className="w-5 h-5" />
               </a>
               <a
                 href="https://www.linkedin.com/in/demi-taylor-nimmo-bb320b40"
@@ -68,7 +69,7 @@ const Footer = () => {
                 rel="noopener noreferrer"
                 className="p-2 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 text-white hover:scale-110 transition-transform"
               >
-                <Linkedin className="w-5 h-5" />
+                <LinkedinIcon className="w-5 h-5" />
               </a>
               <a
                 href="mailto:demi.21@outlook.com"
