@@ -21,6 +21,7 @@
     "clean": "rimraf packages/*/node_modules packages/*/.next packages/*/dist"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
     "@badeball/cypress-cucumber-preprocessor": "^26.0.0",
     "@bahmutov/cypress-esbuild-preprocessor": "^2.2.0",
     "concurrently": "^10.0.5",

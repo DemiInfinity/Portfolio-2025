@@ -20,11 +20,32 @@ export class ApiUnavailableError extends Error {
   }
 }
 
+/**
+ * Next.js throws special internal errors (tagged with a `digest`) to signal
+ * control flow - e.g. DYNAMIC_SERVER_USAGE when a `no-store`/dynamic fetch
+ * runs during a static-generation attempt, so it can fall back to rendering
+ * that route dynamically instead of failing the build. redirect()/notFound()
+ * use the same mechanism (NEXT_REDIRECT/NEXT_HTTP_ERROR_FALLBACK digests).
+ * These must be rethrown unchanged - wrapping them in ApiUnavailableError
+ * destroys the digest Next relies on and turns a graceful fallback into a
+ * hard build failure.
+ */
+function isNextControlFlowError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest
+  return (
+    typeof digest === 'string' &&
+    (digest === 'DYNAMIC_SERVER_USAGE' ||
+      digest.startsWith('NEXT_REDIRECT') ||
+      digest.startsWith('NEXT_HTTP_ERROR_FALLBACK'))
+  )
+}
+
 async function fetchList<T>(url: string, description: string, init?: RequestInit): Promise<T[]> {
   let response: Response
   try {
     response = init ? await fetch(url, init) : await fetch(url)
   } catch (error) {
+    if (isNextControlFlowError(error)) throw error
     console.error(`Error fetching ${description}:`, error)
     throw new ApiUnavailableError(
       `Unable to reach the API to load ${description}. It may be waking up from a cold start - please try again shortly.`,
@@ -46,7 +67,7 @@ async function fetchList<T>(url: string, description: string, init?: RequestInit
     }
     return (data.data ?? []) as T[]
   } catch (error) {
-    if (error instanceof ApiUnavailableError) throw error
+    if (error instanceof ApiUnavailableError || isNextControlFlowError(error)) throw error
     console.error(`Error parsing response for ${description}:`, error)
     throw new ApiUnavailableError(
       `The API returned an unexpected response while loading ${description}.`,
@@ -60,6 +81,7 @@ async function fetchSingle<T>(url: string, description: string, init?: RequestIn
   try {
     response = init ? await fetch(url, init) : await fetch(url)
   } catch (error) {
+    if (isNextControlFlowError(error)) throw error
     console.error(`Error fetching ${description}:`, error)
     throw new ApiUnavailableError(
       `Unable to reach the API to load ${description}. It may be waking up from a cold start - please try again shortly.`,
@@ -85,7 +107,7 @@ async function fetchSingle<T>(url: string, description: string, init?: RequestIn
     }
     return (data.data ?? null) as T | null
   } catch (error) {
-    if (error instanceof ApiUnavailableError) throw error
+    if (error instanceof ApiUnavailableError || isNextControlFlowError(error)) throw error
     console.error(`Error parsing response for ${description}:`, error)
     throw new ApiUnavailableError(
       `The API returned an unexpected response while loading ${description}.`,

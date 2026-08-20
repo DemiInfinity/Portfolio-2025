@@ -8,6 +8,12 @@ interface PageProps {
   params: { slug: string }
 }
 
+// fetchProjectById/fetchProjectBySlug use no-store, and there's no
+// generateStaticParams here, but force this explicitly for the same reason
+// as the other data-fetching pages: never let a build-time backend hiccup
+// turn into a hard build failure instead of a graceful error.tsx.
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const slug = params.slug
   const project = /^\d+$/.test(slug) ? await fetchProjectById(slug) : await fetchProjectBySlug(slug)
