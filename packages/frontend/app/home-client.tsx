@@ -5,6 +5,8 @@ import { ArrowRight, Code, Database, Download, Globe, RefreshCw, Smartphone, Wif
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
+import { useFeatureFlag } from '@/lib/useFeatureFlag'
+import { useResumeAvailability } from '@/lib/useResumeAvailability'
 
 interface Project {
   id: number
@@ -26,6 +28,8 @@ export default function HomeClient({
   projectsUnavailable?: boolean
 }) {
   const router = useRouter()
+  const { enabled: openToWork } = useFeatureFlag('open_to_work')
+  const { available: resumeAvailable, url: resumeUrl } = useResumeAvailability()
   const skills = [
     { icon: Globe, name: 'Frontend Development', description: 'Angular, StencilJS, VITE'},
     { icon: Database, name: 'Backend Development', description: 'Node.js, Express, PostgreSQL' },
@@ -234,11 +238,12 @@ export default function HomeClient({
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
           >
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 backdrop-blur-sm text-white text-sm font-semibold mb-6">
-              <span className="w-2 h-2 rounded-full bg-green-300 animate-pulse" />
-              {/* Edit this line to update availability status */}
-              Open to full-stack roles and freelance work
-            </span>
+            {openToWork && (
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/25 backdrop-blur-sm text-white text-sm font-semibold mb-6">
+                <span className="w-2 h-2 rounded-full bg-green-300 animate-pulse" />
+                Open to full-stack roles and freelance work
+              </span>
+            )}
             <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6" style={{ fontFamily: 'Dancing Script, cursive' }}>
               💖 Let's Work Together
             </h2>
@@ -253,10 +258,12 @@ export default function HomeClient({
               >
                 Get In Touch 💌
               </a>
-              <a href="/resume.pdf" download className="btn-outline-white">
-                <Download className="w-4 h-4 mr-2" />
-                Download CV
-              </a>
+              {resumeAvailable && resumeUrl && (
+                <a href={resumeUrl} download target="_blank" rel="noopener noreferrer" className="btn-outline-white">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download CV
+                </a>
+              )}
             </div>
           </motion.div>
         </div>

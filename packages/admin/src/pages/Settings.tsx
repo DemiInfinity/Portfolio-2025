@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
-import { User, Lock, Save } from 'lucide-react'
+import { User, Lock, Save, FileText, Upload, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface ProfileForm {
@@ -21,7 +21,10 @@ interface PasswordForm {
 const Settings = () => {
   const { user, refreshUser, loading } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
+  const resumeInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingResume, setUploadingResume] = useState(false)
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -51,6 +54,48 @@ const Settings = () => {
       })
     }
   }, [user, resetProfile])
+
+  const { data: resumeStatus } = useQuery({
+    queryKey: ['resume-status'],
+    queryFn: async () => {
+      const res = await api.get('/upload/resume')
+      return res.data as { available: boolean; url: string | null; path?: string }
+    }
+  })
+
+  const deleteResumeMutation = useMutation({
+    mutationFn: () => api.delete('/upload/object', { data: { path: resumeStatus?.path } }),
+    onSuccess: () => {
+      toast.success('Resume removed')
+      queryClient.invalidateQueries({ queryKey: ['resume-status'] })
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Failed to remove resume')
+    }
+  })
+
+  const handleResumeFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.type !== 'application/pdf') {
+      toast.error('Please choose a PDF file')
+      e.target.value = ''
+      return
+    }
+    setUploadingResume(true)
+    try {
+      const formData = new FormData()
+      formData.append('resume', file)
+      await api.post('/upload/resume', formData)
+      toast.success('Resume uploaded')
+      queryClient.invalidateQueries({ queryKey: ['resume-status'] })
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to upload resume')
+    } finally {
+      setUploadingResume(false)
+      e.target.value = ''
+    }
+  }
 
   // Don't render if not authenticated
   if (loading || !user) {
@@ -275,6 +320,52 @@ const Settings = () => {
           </form>
         </div>
       )}
+
+      {/* Resume / CV */}
+      <div className="card p-6">
+        <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
+          📄 Resume / CV
+        </h3>
+        <p className="text-sm text-gray-600 font-medium mb-4">
+          Upload a PDF to show the "Download CV" button on the site. Re-uploading replaces the current file at the same link; removing it hides the button again.
+        </p>
+        {resumeStatus?.available ? (
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl mb-4">
+            <div className="flex items-center gap-3">
+              <FileText className="w-6 h-6 text-green-600" />
+              <div>
+                <p className="text-sm font-bold text-gray-800">Resume uploaded</p>
+                <a href={resumeStatus.url ?? '#'} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-600 hover:underline font-medium">
+                  View current file
+                </a>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => deleteResumeMutation.mutate()}
+              disabled={deleteResumeMutation.isPending}
+              className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border-2 border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
+            >
+              <Trash2 className="w-4 h-4" />
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl mb-4">
+            <p className="text-sm font-medium text-gray-600">No resume uploaded yet - the Download CV button is hidden on the site.</p>
+          </div>
+        )}
+        <input ref={resumeInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleResumeFileChange} />
+        <button
+          type="button"
+          disabled={uploadingResume}
+          onClick={() => resumeInputRef.current?.click()}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border-2 border-pink-200 bg-white text-pink-700 hover:bg-pink-50 transition-colors disabled:opacity-60"
+        >
+          <Upload className="w-4 h-4" />
+          {uploadingResume ? 'Uploading…' : resumeStatus?.available ? 'Replace resume' : 'Upload resume'}
+        </button>
+      </div>
 
       {/* System Information */}
       <div className="card p-6">

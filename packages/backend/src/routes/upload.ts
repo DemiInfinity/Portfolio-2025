@@ -181,6 +181,125 @@ router.post('/images', authenticate, authorize('admin'), (req: Request, res: Res
   })
 })
 
+// Always stored at a fixed path (not a randomly-named object like images
+// above) so re-uploading replaces it in place and the public download URL
+// never changes.
+const RESUME_STORAGE_PATH = `${STORAGE_PREFIX}/resume.pdf`
+
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true)
+    } else {
+      cb(new Error('Only PDF files are allowed'))
+    }
+  },
+  limits: {
+    fileSize: parseInt(process.env.MAX_RESUME_SIZE || '10485760', 10) // 10MB
+  }
+})
+
+// Upload/replace the resume/CV PDF (admin only)
+router.post('/resume', authenticate, authorize('admin'), (req: Request, res: Response, next: NextFunction) => {
+  const uploadMiddleware = resumeUpload.single('resume')
+  uploadMiddleware(req as any, res as any, async (err: unknown) => {
+    if (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed'
+      return res.status(400).json({
+        success: false,
+        error: message
+      })
+    }
+
+    try {
+      const file = (req as any).file as Express.Multer.File | undefined
+      if (!file?.buffer) {
+        return res.status(400).json({
+          success: false,
+          error: 'No file uploaded'
+        })
+      }
+
+      const { supabaseService } = getServices()
+      const client = supabaseService.getClient()
+      const { error } = await client.storage.from(BUCKET).upload(RESUME_STORAGE_PATH, file.buffer, {
+        contentType: 'application/pdf',
+        upsert: true,
+        cacheControl: '3600'
+      })
+
+      if (error) {
+        console.error('Supabase resume upload error:', error.message)
+        return res.status(500).json({
+          success: false,
+          error: error.message || 'Storage upload failed'
+        })
+      }
+
+      const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(RESUME_STORAGE_PATH)
+
+      return res.json({
+        success: true,
+        data: {
+          url: urlData.publicUrl,
+          path: RESUME_STORAGE_PATH,
+          bucket: BUCKET,
+          originalName: file.originalname,
+          size: file.size
+        }
+      })
+    } catch (error) {
+      console.error('Resume upload error:', error)
+      const message = error instanceof Error ? error.message : 'Upload failed'
+      return res.status(500).json({
+        success: false,
+        error: message
+      })
+    }
+  })
+})
+
+// Check resume availability (public) - the frontend uses this to decide
+// whether to show the Download CV button at all, and to get the real URL.
+// Existence of the uploaded file is the source of truth; there's no
+// separate flag to fall out of sync with what's actually been uploaded.
+router.get('/resume', async (_req: Request, res: Response) => {
+  try {
+    const { supabaseService } = getServices()
+    const client = supabaseService.getClient()
+
+    const { data: objects, error } = await client.storage.from(BUCKET).list(STORAGE_PREFIX, {
+      search: 'resume.pdf'
+    })
+
+    if (error || !objects?.some((obj) => obj.name === 'resume.pdf')) {
+      return res.json({
+        success: true,
+        available: false,
+        url: null
+      })
+    }
+
+    const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(RESUME_STORAGE_PATH)
+
+    return res.json({
+      success: true,
+      available: true,
+      url: urlData.publicUrl,
+      path: RESUME_STORAGE_PATH
+    })
+  } catch (error) {
+    console.error('Check resume availability error:', error)
+    // Fail closed on the button rather than 500ing the page over this.
+    return res.json({
+      success: true,
+      available: false,
+      url: null
+    })
+  }
+})
+
 // Delete object by storage path (path within bucket), e.g. site/123-abc.jpg
 router.delete('/object', authenticate, authorize('admin'), async (req: AuthRequest, res: Response) => {
   try {

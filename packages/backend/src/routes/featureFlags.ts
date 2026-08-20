@@ -38,6 +38,43 @@ router.get('/maintenance', async (req: Request, res: Response) => {
   }
 })
 
+// Check any single flag by name (public) - generic version of /maintenance
+// above, for flags the frontend needs to read without exposing the full
+// admin list. Must stay registered before GET /:id below, or a request like
+// /public/open_to_work would get matched as :id="public" by that route
+// instead and 401 under its admin auth.
+router.get('/public/:name', async (req: Request, res: Response) => {
+  try {
+    const { name } = req.params
+    const { supabaseService } = getServices()
+    const { data: flag, error } = await supabaseService.getClient()
+      .from('feature_flags')
+      .select('enabled')
+      .eq('name', name)
+      .single()
+
+    if (error) {
+      // Flag doesn't exist yet - default to disabled rather than erroring,
+      // same fail-safe behavior as /maintenance above.
+      return res.json({
+        success: true,
+        enabled: false
+      })
+    }
+
+    return res.json({
+      success: true,
+      enabled: flag?.enabled || false
+    })
+  } catch (error) {
+    console.error('Check public feature flag error:', error)
+    return res.json({
+      success: true,
+      enabled: false
+    })
+  }
+})
+
 // Get all feature flags (admin only)
 router.get('/', [
   authenticate,
