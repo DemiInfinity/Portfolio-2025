@@ -133,7 +133,7 @@ export async function fetchBlogPosts() {
 }
 
 export async function fetchBlogPostBySlug(slug: string) {
-  return fetchSingle<any>(`${API_BASE_URL}/blog/${slug}`, 'blog post', { next: { revalidate: 60 } })
+  return fetchSingle<any>(`${API_BASE_URL}/blog/${slug}`, 'blog post', { cache: 'no-store' })
 }
 
 export async function fetchLearning() {

@@ -5,10 +5,18 @@ import { resolveMediaUrl } from '@/lib/mediaUrl'
 import { fetchBlogPostBySlug } from '@/lib/api'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string
-  }
+  }>
 }
+
+// This relied on ISR (fetchBlogPostBySlug used revalidate: 60) instead of
+// being forced dynamic like every other data page on the site. That let a
+// bad/transient fetch result get cached and served as a false 404 to every
+// visitor regardless of the real slug's validity - reproduced directly: the
+// backend API returned the post correctly via curl while this route kept
+// 404ing. Force dynamic rendering so it is never served from a stale cache.
+export const dynamic = 'force-dynamic'
 
 // Note: throws ApiUnavailableError (caught by the nearest error.tsx) if the
 // backend can't be reached, and only returns null for a genuine 404 - so a
@@ -18,8 +26,9 @@ async function getBlogPost(slug: string) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const post = await getBlogPost(params.slug)
-  
+  const { slug } = await params
+  const post = await getBlogPost(slug)
+
   if (!post) {
     return {
       title: 'Blog Post Not Found | Blog',
@@ -28,7 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'
-  const url = `${siteUrl}/blog/${params.slug}`
+  const url = `${siteUrl}/blog/${slug}`
   const title = `${post.title} | Blog`
   const description = post.excerpt || 'Read this blog post by Demi Taylor Nimmo'
   const author = post.author || 'Demi Taylor Nimmo'
@@ -64,11 +73,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
-  const post = await getBlogPost(params.slug)
-  
+  const { slug } = await params
+  const post = await getBlogPost(slug)
+
   if (!post) {
     notFound()
   }
 
-  return <BlogPostClient slug={params.slug} />
+  return <BlogPostClient slug={slug} />
 }

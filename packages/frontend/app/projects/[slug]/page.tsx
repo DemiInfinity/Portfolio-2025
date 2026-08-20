@@ -5,7 +5,7 @@ import { fetchProjectById, fetchProjectBySlug } from '@/lib/api'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface PageProps {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }
 
 // fetchProjectById/fetchProjectBySlug use no-store, and there's no
@@ -15,7 +15,7 @@ interface PageProps {
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const slug = params.slug
+  const { slug } = await params
   const project = /^\d+$/.test(slug) ? await fetchProjectById(slug) : await fetchProjectBySlug(slug)
   if (!project) return { title: 'Project Not Found | Projects' }
 
@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function ProjectPage({ params }: PageProps) {
-  const slug = params.slug
+  const { slug } = await params
 
   // Backwards compatibility: allow /projects/:id and redirect to /projects/:slug
   if (/^\d+$/.test(slug)) {
