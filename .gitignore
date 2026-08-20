@@ -43,6 +43,7 @@ cypress/downloads/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 
