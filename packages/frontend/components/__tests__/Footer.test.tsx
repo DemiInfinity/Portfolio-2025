@@ -26,5 +26,14 @@ describe('Footer', () => {
     expect(screen.getByText(new RegExp(currentYear.toString()))).toBeInTheDocument()
     expect(screen.getByText(/Demi Taylor Nimmo/i)).toBeInTheDocument()
   })
+
+  it('includes privacy and terms links', () => {
+    const { container } = render(<Footer />)
+
+    expect(container.querySelector('a[href="/privacy"]')).toBeInTheDocument()
+    expect(container.querySelector('a[href="/terms"]')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Terms of Use' })).toBeInTheDocument()
+  })
 })
 

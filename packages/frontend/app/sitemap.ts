@@ -22,6 +22,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/blog`, lastModified: now },
     { url: `${siteUrl}/experience`, lastModified: now },
     { url: `${siteUrl}/learning`, lastModified: now },
+    { url: `${siteUrl}/privacy`, lastModified: now },
+    { url: `${siteUrl}/terms`, lastModified: now },
   ]
 
   // Projects

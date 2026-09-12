@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { useMaintenanceMode } from '../lib/useMaintenanceMode'
 import MaintenancePage from './MaintenancePage'
 
@@ -11,6 +12,8 @@ interface MaintenanceWrapperProps {
 const MaintenanceWrapper: React.FC<MaintenanceWrapperProps> = ({ children }) => {
   const { isMaintenanceMode, isLoading, error } = useMaintenanceMode()
   const [showMaintenance, setShowMaintenance] = useState(false)
+  const pathname = usePathname()
+  const isLegalPage = pathname === '/privacy' || pathname === '/terms'
 
   // Check maintenance mode in the background without blocking initial render
   useEffect(() => {
@@ -24,7 +27,7 @@ const MaintenanceWrapper: React.FC<MaintenanceWrapperProps> = ({ children }) => 
   }, [isMaintenanceMode, isLoading, error])
 
   // Show maintenance page only if maintenance mode is confirmed enabled
-  if (showMaintenance) {
+  if (showMaintenance && !isLegalPage) {
     return (
       <MaintenancePage 
         estimatedTime="a few hours"

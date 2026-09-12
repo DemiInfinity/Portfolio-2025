@@ -99,11 +99,21 @@ const Footer = () => {
         </div>
 
         <div className="mt-8 pt-8 border-t border-pink-200">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-600 text-sm font-medium">
-              © {currentYear}. All rights reserved. ✨
-            </p>
-            <p className="text-gray-600 text-sm flex items-center mt-2 md:mt-0 font-medium">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-5">
+              <p className="text-gray-600 text-sm font-medium">
+                © {currentYear} Demi Taylor Nimmo. All rights reserved. ✨
+              </p>
+              <nav aria-label="Legal" className="flex items-center gap-4">
+                <a href="/privacy" className="text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
+                  Privacy Policy
+                </a>
+                <a href="/terms" className="text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
+                  Terms of Use
+                </a>
+              </nav>
+            </div>
+            <p className="text-gray-600 text-sm flex items-center font-medium">
               Built with <Heart className="w-4 h-4 mx-1 text-pink-500" /> using Next.js & TypeScript 💖
             </p>
           </div>

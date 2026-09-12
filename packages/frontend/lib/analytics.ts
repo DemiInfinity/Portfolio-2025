@@ -1,3 +1,27 @@
+export const ANALYTICS_OPT_OUT_KEY = 'portfolio_analytics_opt_out'
+
+export function isAnalyticsOptedOut(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(ANALYTICS_OPT_OUT_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function setAnalyticsOptOut(optOut: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    if (optOut) {
+      window.localStorage.setItem(ANALYTICS_OPT_OUT_KEY, '1')
+    } else {
+      window.localStorage.removeItem(ANALYTICS_OPT_OUT_KEY)
+    }
+  } catch {
+    // Private mode or blocked storage — fail closed for opt-out writes
+  }
+}
+
 // Simple analytics tracking utility
 class Analytics {
   private sessionId: string
@@ -26,6 +50,8 @@ class Analytics {
     referrer?: string
     visit_duration?: number
   }) {
+    if (isAnalyticsOptedOut()) return
+
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
         ? `${process.env.NEXT_PUBLIC_API_URL}/api` 
@@ -45,7 +71,7 @@ class Analytics {
   }
 
   trackPageView(path: string, title?: string) {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || isAnalyticsOptedOut()) return
 
     const referrer = document.referrer || undefined
     this.currentPage = path
@@ -60,6 +86,7 @@ class Analytics {
   }
 
   private handleVisibilityChange() {
+    if (isAnalyticsOptedOut()) return
     if (document.hidden && this.currentPage) {
       const duration = Math.round((Date.now() - this.startTime) / 1000)
       if (duration > 5) { // Only track if user spent more than 5 seconds
@@ -75,6 +102,7 @@ class Analytics {
   }
 
   private handlePageUnload() {
+    if (isAnalyticsOptedOut()) return
     if (this.currentPage) {
       const duration = Math.round((Date.now() - this.startTime) / 1000)
       if (duration > 5) {
