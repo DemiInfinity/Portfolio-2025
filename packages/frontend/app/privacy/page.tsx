@@ -6,46 +6,58 @@ import LegalPage, {
   OurAppsList,
 } from '@/components/LegalPage'
 import WebsiteAnalyticsChoice from '@/components/WebsiteAnalyticsChoice'
+import { fetchPublicFeatureFlag, SHOW_MARBL_FLAG } from '@/lib/featureFlags'
+
+export const dynamic = 'force-dynamic'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com').replace(/\/$/, '')
 const privacyTitle = 'Privacy Policy'
-const privacyDescription =
-  'Privacy Policy for mobile apps published by Demi Taylor Nimmo, including Marbl, and for this website.'
 const privacyUrl = `${siteUrl}/privacy`
 
-export const metadata: Metadata = {
-  title: privacyTitle,
-  description: privacyDescription,
-  openGraph: {
-    title: `${privacyTitle} | Demi Taylor Nimmo`,
+export function privacyMetadataFor(showMarbl: boolean): Metadata {
+  const privacyDescription = showMarbl
+    ? 'Privacy Policy for this website and for mobile apps published by Demi Taylor Nimmo, including Marbl.'
+    : 'Privacy Policy for this website, published by Demi Taylor Nimmo.'
+  return {
+    title: privacyTitle,
     description: privacyDescription,
-    url: privacyUrl,
-    siteName: 'Demi Taylor Nimmo',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: `${privacyTitle} | Demi Taylor Nimmo`,
-    description: privacyDescription,
-  },
-  alternates: {
-    canonical: privacyUrl,
-  },
+    openGraph: {
+      title: `${privacyTitle} | Demi Taylor Nimmo`,
+      description: privacyDescription,
+      url: privacyUrl,
+      siteName: 'Demi Taylor Nimmo',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `${privacyTitle} | Demi Taylor Nimmo`,
+      description: privacyDescription,
+    },
+    alternates: {
+      canonical: privacyUrl,
+    },
+  }
 }
 
-export default function PrivacyPolicyPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  return privacyMetadataFor(await fetchPublicFeatureFlag(SHOW_MARBL_FLAG))
+}
+
+export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
   return (
     <LegalPage title="🔒 Privacy Policy" otherHref="/terms" otherLabel="Terms of Use">
       <p>
-        These policies apply to this website and to mobile apps we publish,
-        including Marbl and any other apps we list below.
+        {showMarbl
+          ? 'These policies apply to this website and to mobile apps we publish, including Marbl and any other apps we list below.'
+          : 'These policies apply to this website. When we publish a mobile app, we will list it below and say what that app collects.'}
       </p>
 
       <h2>Who we are</h2>
       <p>
-        This website and the apps listed below are published by Demi Taylor
-        Nimmo (“we”, “us”). I am a solo developer. You can contact me at{' '}
-        <LegalContactLink />.
+        {showMarbl
+          ? 'This website and the apps listed below are published by Demi Taylor Nimmo (“we”, “us”).'
+          : 'This website is published by Demi Taylor Nimmo (“we”, “us”).'}{' '}
+        I am a solo developer. You can contact me at <LegalContactLink />.
       </p>
       <p>
         This website is <a href={LEGAL_SITE_URL}>{LEGAL_SITE_URL.replace('https://', '')}</a>.
@@ -74,8 +86,8 @@ export default function PrivacyPolicyPage() {
       </p>
       <p>
         We use this only to understand which pages are visited and to keep the
-        site working. We do not use it to advertise, to profile you, or to
-        track you across our apps.
+        site working. We do not use it to advertise or to profile you
+        {showMarbl ? ', or to track you across our apps' : ''}.
       </p>
       <p>
         We do not set first-party cookies for analytics. The session id lives
@@ -129,8 +141,10 @@ export default function PrivacyPolicyPage() {
         This website is not directed at children under 13.
       </p>
 
+      {showMarbl && (
+      <>
       <h2>Our apps</h2>
-      <OurAppsList />
+      <OurAppsList showMarbl={showMarbl} />
 
       <h2>What the apps collect</h2>
       <p>
@@ -151,8 +165,7 @@ export default function PrivacyPolicyPage() {
       </p>
       <p>
         We do not use third-party analytics SDKs in the apps listed below unless
-        a product section says otherwise. Marbl does not use third-party
-        analytics SDKs.
+        a product section says otherwise.
       </p>
 
       <h3>Store purchases</h3>
@@ -305,10 +318,17 @@ export default function PrivacyPolicyPage() {
           </tbody>
         </table>
       </div>
+      </>
+      )}
 
       <p>
         Related: <Link href="/terms">Terms of Use</Link>.
       </p>
     </LegalPage>
   )
+}
+
+export default async function PrivacyPolicyPage() {
+  const showMarbl = await fetchPublicFeatureFlag(SHOW_MARBL_FLAG)
+  return <PrivacyPolicyContent showMarbl={showMarbl} />
 }

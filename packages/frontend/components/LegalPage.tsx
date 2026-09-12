@@ -29,7 +29,17 @@ export function LegalContactLink({ children }: { children?: ReactNode }) {
   )
 }
 
-export function OurAppsList() {
+export function OurAppsList({ showMarbl }: { showMarbl: boolean }) {
+  if (!showMarbl) {
+    return (
+      <p>
+        We have not listed a published mobile app here yet. When we do, it will
+        appear on this list with its own collection details, instead of
+        rewriting these shared rules.
+      </p>
+    )
+  }
+
   return (
     <>
       <p>Today that list is:</p>

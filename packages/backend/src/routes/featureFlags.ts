@@ -6,6 +6,29 @@ import { getServices } from '../services'
 
 const router = express.Router()
 
+const KNOWN_FLAGS = [
+  {
+    name: 'show_marbl',
+    description: 'Show Marbl on the public Privacy Policy and Terms of Use',
+    enabled: false,
+  },
+] as const
+
+async function ensureKnownFlags() {
+  try {
+    const { supabaseService } = getServices()
+    const client = supabaseService.getClient()
+    for (const flag of KNOWN_FLAGS) {
+      await client.from('feature_flags').upsert(flag, {
+        onConflict: 'name',
+        ignoreDuplicates: true,
+      })
+    }
+  } catch (error) {
+    console.error('Ensure known feature flags error:', error)
+  }
+}
+
 // Check maintenance mode (public)
 router.get('/maintenance', async (req: Request, res: Response) => {
   try {
@@ -81,6 +104,7 @@ router.get('/', [
   authorize('admin')
 ], async (req: AuthRequest, res: Response) => {
   try {
+    await ensureKnownFlags()
     const { supabaseService } = getServices()
     const { data: featureFlags, error } = await supabaseService.getClient()
       .from('feature_flags')

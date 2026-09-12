@@ -67,7 +67,8 @@ INSERT INTO feature_flags (name, description, enabled) VALUES
 ('dark_mode', 'Enable dark mode theme', true),
 ('beta_features', 'Enable beta features for testing', false),
 ('analytics_tracking', 'Enable advanced analytics tracking', true),
-('maintenance_mode', 'Enable maintenance mode banner', false)
+('maintenance_mode', 'Enable maintenance mode banner', false),
+('show_marbl', 'Show Marbl on the public Privacy Policy and Terms of Use', false)
 ON CONFLICT (name) DO NOTHING;
 
 -- Update existing blog posts to have author and read_time

@@ -5,50 +5,64 @@ import LegalPage, {
   LegalContactLink,
   OurAppsList,
 } from '@/components/LegalPage'
+import { fetchPublicFeatureFlag, SHOW_MARBL_FLAG } from '@/lib/featureFlags'
+
+export const dynamic = 'force-dynamic'
 
 const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com').replace(/\/$/, '')
 const termsTitle = 'Terms of Use'
-const termsDescription =
-  'Terms of Use for this website and for mobile apps published by Demi Taylor Nimmo, including Marbl.'
 const termsUrl = `${siteUrl}/terms`
 
-export const metadata: Metadata = {
-  title: termsTitle,
-  description: termsDescription,
-  openGraph: {
-    title: `${termsTitle} | Demi Taylor Nimmo`,
+export function termsMetadataFor(showMarbl: boolean): Metadata {
+  const termsDescription = showMarbl
+    ? 'Terms of Use for this website and for mobile apps published by Demi Taylor Nimmo, including Marbl.'
+    : 'Terms of Use for this website, published by Demi Taylor Nimmo.'
+  return {
+    title: termsTitle,
     description: termsDescription,
-    url: termsUrl,
-    siteName: 'Demi Taylor Nimmo',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary',
-    title: `${termsTitle} | Demi Taylor Nimmo`,
-    description: termsDescription,
-  },
-  alternates: {
-    canonical: termsUrl,
-  },
+    openGraph: {
+      title: `${termsTitle} | Demi Taylor Nimmo`,
+      description: termsDescription,
+      url: termsUrl,
+      siteName: 'Demi Taylor Nimmo',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary',
+      title: `${termsTitle} | Demi Taylor Nimmo`,
+      description: termsDescription,
+    },
+    alternates: {
+      canonical: termsUrl,
+    },
+  }
 }
 
-export default function TermsOfUsePage() {
+export async function generateMetadata(): Promise<Metadata> {
+  return termsMetadataFor(await fetchPublicFeatureFlag(SHOW_MARBL_FLAG))
+}
+
+export function TermsOfUseContent({ showMarbl }: { showMarbl: boolean }) {
   return (
     <LegalPage title="📜 Terms of Use" otherHref="/privacy" otherLabel="Privacy Policy">
       <p>
-        These terms apply to this website and to mobile apps we publish,
-        including Marbl and any other apps we list below.
+        {showMarbl
+          ? 'These terms apply to this website and to mobile apps we publish, including Marbl and any other apps we list below.'
+          : 'These terms apply to this website. When we publish a mobile app, we will list it below.'}
       </p>
       <p>
-        By using this website, or by downloading or using our apps, you agree to
-        these Terms of Use and to our <Link href="/privacy">Privacy Policy</Link>.
+        By using this website
+        {showMarbl ? ', or by downloading or using our apps,' : ','} you agree
+        to these Terms of Use and to our{' '}
+        <Link href="/privacy">Privacy Policy</Link>.
       </p>
 
       <h2>Who we are</h2>
       <p>
-        This website and the apps listed below are published by Demi Taylor
-        Nimmo (“we”, “us”). I am a solo developer. You can contact me at{' '}
-        <LegalContactLink />.
+        {showMarbl
+          ? 'This website and the apps listed below are published by Demi Taylor Nimmo (“we”, “us”).'
+          : 'This website is published by Demi Taylor Nimmo (“we”, “us”).'}{' '}
+        I am a solo developer. You can contact me at <LegalContactLink />.
       </p>
       <p>
         This website is <a href={LEGAL_SITE_URL}>{LEGAL_SITE_URL.replace('https://', '')}</a>.
@@ -98,8 +112,10 @@ export default function TermsOfUsePage() {
         turn site analytics off in your browser.
       </p>
 
+      {showMarbl && (
+      <>
       <h2>Our apps</h2>
-      <OurAppsList />
+      <OurAppsList showMarbl={showMarbl} />
 
       <h2>Licence</h2>
       <p>
@@ -134,38 +150,45 @@ export default function TermsOfUsePage() {
         Google. We do not process payments or refunds. Refund requests follow
         the relevant store’s rules.
       </p>
+      </>
+      )}
 
       <h2>Acceptable use</h2>
       <p>You must not:</p>
       <ul>
-        <li>misuse the apps or this website</li>
-        <li>reverse engineer the apps beyond what applicable law allows</li>
-        <li>use the apps or this website for illegal purposes</li>
+        <li>misuse {showMarbl ? 'the apps or this website' : 'this website'}</li>
+        {showMarbl && (
+          <li>reverse engineer the apps beyond what applicable law allows</li>
+        )}
+        <li>use {showMarbl ? 'the apps or this website' : 'this website'} for illegal purposes</li>
       </ul>
 
       <h2>Disclaimer</h2>
       <p>
-        The apps and this website are provided “as is”. We do not warrant that
-        logs or reminders are complete, or that in-app guidance is suitable for
-        every situation or, where relevant, every pet. We do not warrant that
-        this website will always be available or error-free.
+        {showMarbl
+          ? 'The apps and this website are provided “as is”. We do not warrant that logs or reminders are complete, or that in-app guidance is suitable for every situation or, where relevant, every pet. We do not warrant that this website will always be available or error-free.'
+          : 'This website is provided “as is”. We do not warrant that it will always be available or error-free.'}
       </p>
 
       <h2>Limitation of liability</h2>
       <p>
         To the fullest extent permitted by the laws of England and Wales, our
-        liability arising from your use of the apps or this website is limited.
+        liability arising from your use of {showMarbl ? 'the apps or this website' : 'this website'} is limited.
         Nothing in these terms excludes or limits liability that cannot be
         excluded under UK law, including for death or personal injury caused by
         negligence, or for fraud.
       </p>
 
+      {showMarbl && (
+      <>
       <h2>Termination</h2>
       <p>
         You can stop using an app and uninstall it at any time. Paid
         entitlements follow the rules of the store account you used to purchase
         them.
       </p>
+      </>
+      )}
 
       <h2>Changes and contact</h2>
       <p>
@@ -176,6 +199,8 @@ export default function TermsOfUsePage() {
         Questions: <LegalContactLink />.
       </p>
 
+      {showMarbl && (
+      <>
       <h2>Marbl</h2>
       <p>
         Marbl is a local cat-care logging and training helper. It is not a
@@ -189,6 +214,13 @@ export default function TermsOfUsePage() {
         or Google account you used to buy. Refunds follow Apple and Google
         rules. Pro status is not included in exported backups.
       </p>
+      </>
+      )}
     </LegalPage>
   )
+}
+
+export default async function TermsOfUsePage() {
+  const showMarbl = await fetchPublicFeatureFlag(SHOW_MARBL_FLAG)
+  return <TermsOfUseContent showMarbl={showMarbl} />
 }
