@@ -1,0 +1,1 @@
+You need a full-stack monorepo... but you also need it to be absolutely adorable. Next.js, Express, and PostgreSQL, all wrapped up in pink gradients and floating hearts. Demi Taylor Nimmo. Serious engineering, cute vibes.
