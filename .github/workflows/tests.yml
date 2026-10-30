@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'yarn'
       
       - name: Install dependencies
@@ -42,96 +42,78 @@ jobs:
 
   e2e-tests:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'yarn'
-      
+
       - name: Install dependencies
         run: yarn install --frozen-lockfile
-      
-      - name: Start frontend
+
+      # The e2e suites never touch the real API or database. The site reads
+      # from a fixture mock API (cypress/support/frontend/mock-api.mjs), and the
+      # admin specs stub every request with cy.intercept.
+      - name: Start mock API (:4010)
+        run: |
+          nohup node cypress/support/frontend/mock-api.mjs > /tmp/mock-api.log 2>&1 &
+          npx wait-on http-get://localhost:4010/api/projects -t 30000
+
+      - name: Build and start the site (:3000)
         run: |
           cd packages/frontend
           yarn build
-          yarn start &
+          nohup yarn start > /tmp/site.log 2>&1 &
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:5000
-      
-      - name: Start backend
-        run: |
-          cd packages/backend
-          yarn build
-          yarn start &
-        env:
-          PORT: 5000
-      
-      - name: Wait for servers
-        run: |
-          npx wait-on http://localhost:3000 http://localhost:5000 -t 60000
-      
-      - name: Start admin panel
+          NEXT_PUBLIC_API_URL: http://localhost:4010
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+      - name: Build and preview the admin (:3002)
         run: |
           cd packages/admin
           yarn build
-          # Start preview server in background
-          nohup npx vite preview --port 3002 --host 0.0.0.0 > /tmp/admin-preview.log 2>&1 &
-          echo $! > /tmp/admin-pid.txt
-          # Wait a bit for server to start
-          sleep 3
-          # Verify server started
-          for i in {1..10}; do
-            if curl -f http://localhost:3002 > /dev/null 2>&1; then
-              echo "✅ Admin panel started successfully on port 3002"
-              exit 0
-            fi
-            echo "Waiting for admin panel... attempt $i/10"
-            sleep 2
-          done
-          echo "⚠️ Admin panel may not be ready, but continuing..."
-          cat /tmp/admin-preview.log || true
-        continue-on-error: true
-      
-      - name: Verify admin panel
-        run: |
-          if curl -f http://localhost:3002 > /dev/null 2>&1; then
-            echo "✅ Admin panel is accessible"
-          else
-            echo "⚠️ Admin panel not accessible - admin tests may be skipped"
-          fi
-        continue-on-error: true
-      
-      - name: Run Cypress tests
+          nohup npx vite preview --port 3002 --strictPort > /tmp/admin.log 2>&1 &
+        env:
+          VITE_API_URL: http://localhost:4010
+          VITE_SITE_URL: http://localhost:3000
+
+      - name: Wait for both apps
+        run: npx wait-on http://localhost:3000 http://localhost:3002 -t 120000
+
+      - name: Cypress, site
         uses: cypress-io/github-action@v6
         with:
           install: false
-          wait-on: 'http://localhost:3000'
-          wait-on-timeout: 120
+          spec: cypress/e2e/frontend/**/*.feature
+          config: baseUrl=http://localhost:3000
+
+      - name: Cypress, admin
+        uses: cypress-io/github-action@v6
+        with:
+          install: false
+          spec: cypress/e2e/admin/**/*.feature,cypress/e2e/admin-login.feature
+          config: baseUrl=http://localhost:3002
         env:
-          CYPRESS_baseUrl: http://localhost:3000
           CYPRESS_ADMIN_URL: http://localhost:3002
-          # NOTE: Admin login tests use TEST-ONLY credentials and intercept API calls.
-          # Real admin credentials are NOT used - all API calls are mocked.
-          # These env vars are kept for documentation but are not actually used in tests.
-          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-      
+
+      - name: Server logs
+        if: failure()
+        run: tail -n 80 /tmp/mock-api.log /tmp/site.log /tmp/admin.log || true
+
       - name: Upload Cypress screenshots
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-screenshots
           path: cypress/screenshots
-      
+
       - name: Upload Cypress videos
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-videos
           path: cypress/videos
-

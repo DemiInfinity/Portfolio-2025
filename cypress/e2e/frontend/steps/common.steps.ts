@@ -63,8 +63,23 @@ Given('the page uses print media', () => {
 })
 
 Given('the site flag {string} is {word}', (name: string, state: string) => {
-  flags = { ...flags, [name]: state === 'on' }
+  // on | off | missing (flag row absent: 404 like an unknown flag) | failing (500)
+  const { [name]: _drop, ...rest } = flags
+  flags = state === 'on' || state === 'off' ? { ...rest, [name]: state === 'on' } : rest
   mockData('flags', flags)
+  if (state === 'missing') mockRoute(`GET /api/feature-flags/public/${name}`, 404, { success: false, error: 'Feature flag not found' })
+  if (state === 'failing') mockRoute(`GET /api/feature-flags/public/${name}`, 500)
+})
+
+Given('the visitor has {string} set to {string} in localStorage', (key: string, value: string) => {
+  // Seeded on the app origin before the page script runs.
+  cy.on('window:before:load', (win) => {
+    try {
+      win.localStorage.setItem(key, value)
+    } catch {
+      /* ignore */
+    }
+  })
 })
 
 Given('maintenance mode is on', () => {

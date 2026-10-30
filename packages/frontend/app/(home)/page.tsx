@@ -3,6 +3,7 @@ import { fetchEducation, fetchProjects, fetchWorkHistory, ApiUnavailableError } 
 import type { Project } from '@/lib/api'
 import { degreeStat, pickRecentWork, yearsStat } from '@/lib/selectors'
 import { homeTeaser } from '@/lib/content/site'
+import { fetchPublicFeatureFlag, SHOW_COLOURWAYS_FLAG } from '@/lib/featureFlags'
 import HomeClient from './home-client'
 import type { HomeStats } from './home-client'
 
@@ -34,6 +35,8 @@ export default async function Home() {
   let projects: Project[] = []
   let projectsUnavailable = false
   const statsPromise = loadStats()
+  // Missing or failed flag reads resolve to false (switcher hidden, Lilac).
+  const colourwaysPromise = fetchPublicFeatureFlag(SHOW_COLOURWAYS_FLAG)
   try {
     // H-19: the API already returns only public projects.
     projects = pickRecentWork(await fetchProjects())
@@ -46,5 +49,12 @@ export default async function Home() {
     }
   }
 
-  return <HomeClient projects={projects} projectsUnavailable={projectsUnavailable} stats={await statsPromise} />
+  return (
+    <HomeClient
+      projects={projects}
+      projectsUnavailable={projectsUnavailable}
+      stats={await statsPromise}
+      showColourways={await colourwaysPromise}
+    />
+  )
 }

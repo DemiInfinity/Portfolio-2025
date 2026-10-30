@@ -50,7 +50,8 @@ Feature: Home page (F-11, F-9, D-3, D-6 badge, D-8 Download CV)
     When the visitor opens "/"
     Then the visitor sees "New projects are on the way."
 
-  Scenario: F-11 AC4 colourway switches on Home only; the rest of the site stays Lilac
+  Scenario: F-11 AC4 colourway switches on Home only; the rest of the site stays Lilac (show_colourways on)
+    Given the site flag "show_colourways" is on
     When the visitor opens "/"
     And the visitor clicks "Rose"
     Then the swatch "Rose" is pressed
@@ -59,7 +60,8 @@ Feature: Home page (F-11, F-9, D-3, D-6 badge, D-8 Download CV)
     Then the URL path is "/about"
     And the CSS variable "--b1" on body is "#7c3aed"
 
-  Scenario: F-11 AC4 colourway is Lilac on /about after a full reload too
+  Scenario: F-11 AC4 colourway is Lilac on /about after a full reload too (show_colourways on)
+    Given the site flag "show_colourways" is on
     When the visitor opens "/"
     And the visitor clicks "Moonlight"
     And the visitor opens "/about"
@@ -106,3 +108,26 @@ Feature: Home page (F-11, F-9, D-3, D-6 badge, D-8 Download CV)
       | screen  |
       | desktop |
       | phone   |
+
+  Scenario: show_colourways on: a remembered colourway is restored on Home
+    Given the site flag "show_colourways" is on
+    And the visitor has "home_colourway" set to "Rose" in localStorage
+    When the visitor opens "/"
+    Then the swatch "Rose" is pressed
+    And the visitor sees "Colourway: Rose"
+    And the CSS variable "--b1" on body is not "#7c3aed"
+
+  Scenario Outline: show_colourways <state>: no switcher, Lilac, remembered choice ignored
+    Given the site flag "show_colourways" is <state>
+    And the visitor has "home_colourway" set to "Rose" in localStorage
+    When the visitor opens "/"
+    Then the page does not show "Colourway:"
+    And there is no "Rose" button
+    And there is no "Lilac" button
+    And the CSS variable "--b1" on body is "#7c3aed"
+
+    Examples:
+      | state   |
+      | off     |
+      | missing |
+      | failing |

@@ -65,6 +65,10 @@ Then('the CSS variable {string} on body is {string}', (name: string, value: stri
   cy.get('body').should(($b) => expect(getComputedStyle($b[0]).getPropertyValue(name).trim().toLowerCase()).to.eq(value))
 })
 
+Then('the CSS variable {string} on body is not {string}', (name: string, value: string) => {
+  cy.get('body').should(($b) => expect(getComputedStyle($b[0]).getPropertyValue(name).trim().toLowerCase()).not.to.eq(value))
+})
+
 Then('there is an img role whose name contains {string}', (t: string) => {
   cy.get('[role="img"]').filter((_, el) => accName(el).includes(t)).should('have.length.gte', 1)
 })

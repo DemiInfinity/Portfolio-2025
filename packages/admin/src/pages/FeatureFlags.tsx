@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { apiError } from '@/lib/errors'
-import { FLAGS_KEY, KNOWN_FLAGS, flagLabel, isOn, useFlags, type FeatureFlag } from '@/lib/flags'
+import { BUILT_IN_FLAGS, FLAGS_KEY, KNOWN_DESCRIPTIONS, flagDescription, flagLabel, isOn, useFlags, type FeatureFlag } from '@/lib/flags'
 import { useQ } from '@/hooks/useQ'
 import { useFlagToggle } from '@/components/useFlagToggle'
 import Dialog from '@/components/ui/Dialog'
@@ -35,7 +35,7 @@ export default function FeatureFlags() {
   const keyErr = serverErr || (tried && taken ? `A flag called ${key} already exists.` : tried && !KEY_RE.test(key) ? KEY_HINT : '')
 
   const create = useMutation({
-    mutationFn: () => api.post('/feature-flags', { name: key, description: desc.trim() }),
+    mutationFn: () => api.post('/feature-flags', { name: key, description: desc.trim() || KNOWN_DESCRIPTIONS[key] || '' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: FLAGS_KEY })
       setAdding(false)
@@ -89,7 +89,7 @@ export default function FeatureFlags() {
             <ul className="rows">
               {shown.map((f) => {
                 const label = flagLabel(f.name)
-                const builtIn = f.name in KNOWN_FLAGS
+                const builtIn = BUILT_IN_FLAGS.has(f.name)
                 return (
                   <li key={f.id} style={{ padding: '16px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -97,7 +97,7 @@ export default function FeatureFlags() {
                         <p style={{ fontSize: 15, fontWeight: 600 }}>{label}</p>
                         <span className={'pill ' + (f.enabled ? (f.name === 'maintenance_mode' ? 'p-draft' : 'p-live') : 'p-off')}>{f.enabled ? 'On' : 'Off'}</span>
                       </div>
-                      {f.description ? <p className="mute" style={{ fontSize: 14 }}>{f.description}</p> : null}
+                      {flagDescription(f) ? <p className="mute" style={{ fontSize: 14 }}>{flagDescription(f)}</p> : null}
                       <p className="mono mute" style={{ fontSize: 12 }}>{f.name}</p>
                       {!builtIn ? (
                         <button type="button" className="btn btn-text" style={{ alignSelf: 'flex-start', minHeight: 32, padding: '0 8px', marginLeft: -8, color: '#b4235a' }} onClick={() => setDeleting(f)} aria-label={`Delete ${f.name}`}>Delete</button>

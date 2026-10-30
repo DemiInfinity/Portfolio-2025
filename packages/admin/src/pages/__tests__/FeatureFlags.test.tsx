@@ -20,6 +20,7 @@ describe('flagLabel', () => {
   it('uses known labels and humanises the rest', () => {
     expect(flagLabel('maintenance_mode')).toBe('Maintenance mode')
     expect(flagLabel('show_reviews')).toBe('Show reviews')
+    expect(flagLabel('show_colourways')).toBe('Colour switcher')
   })
 })
 
@@ -111,5 +112,23 @@ describe('FeatureFlags', () => {
     await user.click(within(c).getByRole('button', { name: 'Delete flag' }))
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/feature-flags/9'))
     expect(screen.getAllByRole('button', { name: /^Delete / })).toHaveLength(1)
+  })
+
+  it('creates show_colourways with the known description, then shows its friendly label and a delete', async () => {
+    const user = userEvent.setup()
+    const DESC = 'Lets visitors switch the home page between the Lilac, Rose and Moonlight colourways.'
+    vi.mocked(api.post).mockImplementation(async (_u: string, b: unknown) => {
+      flags = [...flags, { id: 4, name: (b as { name: string }).name, description: (b as { description: string }).description, enabled: false }]
+      return { data: { success: true } } as never
+    })
+    renderApp(<FeatureFlags />)
+    await user.click(await screen.findByRole('button', { name: 'New flag' }))
+    await user.type(screen.getByLabelText('Key'), 'show_colourways')
+    await user.click(screen.getByRole('button', { name: 'Create flag' }))
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/feature-flags', { name: 'show_colourways', description: DESC }))
+    expect(await screen.findByRole('switch', { name: 'Colour switcher' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText(DESC)).toBeInTheDocument()
+    expect(screen.getByText('4 flags, 1 on. Each switches part of the live site.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete show_colourways' })).toBeInTheDocument()
   })
 })

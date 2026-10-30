@@ -1,4 +1,6 @@
 export const SHOW_MARBL_FLAG = 'show_marbl'
+/** Home page colourway switcher (owner request). Off, missing or failed = hidden, site stays Lilac. */
+export const SHOW_COLOURWAYS_FLAG = 'show_colourways'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}/api`

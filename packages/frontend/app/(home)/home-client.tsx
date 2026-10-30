@@ -30,11 +30,12 @@ export type HomeStats = {
  * when you leave, so every other page stays Lilac. Remembered (optional) in
  * localStorage under `home_colourway`.
  */
-function useColourway() {
+function useColourway(enabled: boolean) {
   const [stored, setStored] = useLocalStorage(COLOURWAY_KEY)
   const [picked, setPicked] = useState<number | null>(null)
   const storedIndex = colourways.findIndex((c) => c.name === stored)
-  const index = picked ?? (storedIndex >= 0 ? storedIndex : 0)
+  // Flag off: always Lilac, and any remembered choice is ignored.
+  const index = enabled ? picked ?? (storedIndex >= 0 ? storedIndex : 0) : 0
 
   useEffect(() => {
     const way: Colourway = colourways[index]
@@ -173,15 +174,18 @@ export default function HomeClient({
   projects,
   projectsUnavailable = false,
   stats,
+  showColourways = false,
 }: {
   projects: Project[]
   projectsUnavailable?: boolean
   stats?: HomeStats
+  /** `show_colourways` flag, read on the server. */
+  showColourways?: boolean
 }) {
   const router = useRouter()
   const { enabled: openToWork, isLoading: flagLoading } = useFeatureFlag('open_to_work')
   const { available: resumeAvailable, url: resumeUrl } = useResumeAvailability()
-  const [cw, setCw] = useColourway()
+  const [cw, setCw] = useColourway(showColourways)
   const way = colourways[cw]
 
   const years = stats?.years ?? homeTeaser.yearsStat
@@ -235,6 +239,7 @@ export default function HomeClient({
                 {homeHero.secondaryCta}
               </Button>
             </div>
+            {showColourways && (
             <div className="in" style={{ ...delay(900), display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, fontSize: 'var(--t-sm)', fontWeight: 500 }}>
               <span id="cw-label">Colourway: {way.name}</span>
               <div role="group" aria-labelledby="cw-label" style={{ display: 'flex', gap: 10 }}>
@@ -261,6 +266,7 @@ export default function HomeClient({
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           <div className="in product-col" style={{ ...delay(200), position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: 680 }}>
