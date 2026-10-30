@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express'
 import { getServices } from '../services'
+import { purgeOldAnalytics, purgeOldContactMessages } from '../services/analyticsRetention'
 
 const router = express.Router()
 
@@ -26,9 +27,17 @@ router.get('/', async (req: Request, res: Response) => {
       })
     }
 
+    // 12-month retention for analytics and Hire me messages (privacy notice,
+    // D-10). Runs on every keep-alive ping (GitHub Actions, every 3 days);
+    // failures are logged, never thrown.
+    const purge = await purgeOldAnalytics()
+    const contactPurge = await purgeOldContactMessages()
+
     return res.json({
       success: true,
       message: 'Database keep-alive successful',
+      analytics_purged: 'deleted' in purge ? purge.deleted : null,
+      contact_purged: 'deleted' in contactPurge ? contactPurge.deleted : null,
       timestamp: new Date().toISOString(),
       database: 'active'
     })

@@ -1,12 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import PageError from '@/components/PageError'
+import ErrorView from '@/components/ErrorView'
+import type { ErrorBoundaryProps } from '@/components/ErrorView'
 
-export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => {
-    console.error(error)
-  }, [error])
-
-  return <PageError title="Couldn't load the CV" reset={reset} />
+export default function Error(props: ErrorBoundaryProps) {
+  return <ErrorView {...props} title="Couldn't load the CV" />
 }

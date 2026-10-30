@@ -15,5 +15,11 @@
       "dest": "src/vercel.ts"
     }
   ],
-  "ignoreCommand": "bash ignore-build-step.sh"
+  "ignoreCommand": "bash ignore-build-step.sh",
+  "crons": [
+    {
+      "path": "/api/keepalive",
+      "schedule": "43 4 * * *"
+    }
+  ]
 }

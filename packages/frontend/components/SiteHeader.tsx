@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { useSitePathname } from './SitePathname'
 import Button from '@/components/ui/Button'
 import IconButton, { MenuIcon } from '@/components/ui/IconButton'
 import { useOverlay } from '@/components/overlays/OverlayProvider'
@@ -27,7 +27,7 @@ export const CASE_STUDY_HERO_ID = 'cs-hero'
  * progress bar. Post: sticky and light with a progress bar.
  */
 export default function SiteHeader() {
-  const pathname = usePathname()
+  const pathname = useSitePathname()
   const { openContact, openMenu } = useOverlay()
   const variant = headerVariantFor(pathname)
   const [pastHero, setPastHero] = useState(false)

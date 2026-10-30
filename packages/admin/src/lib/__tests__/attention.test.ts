@@ -44,4 +44,11 @@ describe('computeAttention', () => {
     const two = { ...base, courses: [base.courses[1], { ...base.courses[1], title: 'B' }], cv: null }
     expect(finding(two, today)).toBe('2 courses are past their target.')
   })
+
+  it('puts unread messages first, linking to /messages, and skips them at 0', () => {
+    const items = computeAttention({ ...base, unread: 2 }, today)
+    expect(items[0]).toMatchObject({ title: '2 unread messages', action: 'Read messages', href: '/messages' })
+    expect(computeAttention({ ...base, unread: 1 }, today)[0].title).toBe('1 unread message')
+    expect(computeAttention({ ...base, unread: 0 }, today).some((i) => i.href === '/messages')).toBe(false)
+  })
 })

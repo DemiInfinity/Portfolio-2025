@@ -7,6 +7,7 @@ import { navFor, NAV } from '@/lib/nav'
 import Login from '@/pages/Login'
 import Dashboard from './pages/Dashboard'
 import About from './pages/About'
+import Messages from './pages/Messages'
 import Projects from './pages/Projects'
 import Learning from './pages/Learning'
 import WorkHistory from './pages/WorkHistory'
@@ -36,6 +37,7 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/messages" element={<Messages />} />
         <Route path="/about" element={<About />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/learning" element={<Learning />} />

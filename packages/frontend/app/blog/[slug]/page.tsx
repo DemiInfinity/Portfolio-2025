@@ -5,6 +5,7 @@ import { resolveMediaUrl } from '@/lib/mediaUrl'
 import { fetchBlogPostBySlug, fetchBlogPosts } from '@/lib/api'
 import type { BlogPost } from '@/lib/api'
 import { keepReading } from '@/lib/selectors'
+import { DEFAULT_OG_IMAGE, siteUrl } from '@/lib/siteUrl'
 
 interface PageProps {
   params: Promise<{
@@ -38,12 +39,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     }
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'
-  const url = `${siteUrl}/blog/${slug}`
+  const url = siteUrl(`/blog/${post.slug || slug}`)
   const title = `${post.title} | Blog`
   const description = post.excerpt || 'Read this blog post by Demi Taylor Nimmo'
   const author = post.author || 'Demi Taylor Nimmo'
-  const ogImage = post.cover_image ? resolveMediaUrl(post.cover_image) : undefined
+  // LinkedIn builds its preview from og:image; fall back to the site default (1200×630).
+  const ogImage = post.cover_image ? resolveMediaUrl(post.cover_image) : siteUrl(DEFAULT_OG_IMAGE)
+  const ogImageMeta = post.cover_image
+    ? { url: ogImage, alt: post.title }
+    : { url: ogImage, alt: 'Demi Taylor Nimmo, full-stack software engineer', width: 1200, height: 630 }
 
   return {
     title,
@@ -59,14 +63,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       publishedTime: post.publish_date || post.created_at || undefined,
       authors: [author],
       tags: post.tags ? (Array.isArray(post.tags) ? post.tags : JSON.parse(post.tags || '[]')) : [],
-      ...(ogImage ? { images: [{ url: ogImage, alt: post.title }] } : {}),
+      images: [ogImageMeta],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
       creator: '@demitaylornimmo',
-      ...(ogImage ? { images: [ogImage] } : {}),
+      images: [ogImage],
     },
     alternates: {
       canonical: url,
@@ -82,9 +86,8 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound()
   }
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com').replace(/\/$/, '')
   const others = await loadOthers()
-  return <BlogPostClient post={post} url={`${siteUrl}/blog/${post.slug || slug}`} keepReading={keepReading(others, post)} />
+  return <BlogPostClient post={post} url={siteUrl(`/blog/${post.slug || slug}`)} keepReading={keepReading(others, post)} />
 }
 
 /** "Keep reading" is optional: a failed list just hides it. */

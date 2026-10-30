@@ -8,6 +8,8 @@ export type AttentionInput = {
   cv: CvStatus | null | undefined
   certCount: number
   latestPost: { title: string; publish_date?: string } | undefined
+  /** Unread Hire me messages (H-24). Only the count is used here, never message content. */
+  unread?: number
 }
 
 const short = (t: string) => t.split(':')[0].trim()
@@ -29,6 +31,9 @@ export const daysSince = (iso: string, today: Date) => -daysUntil(iso, today)
 /** The Dashboard's "Needs attention" list, in the plan's order. */
 export function computeAttention(c: AttentionInput, today: Date): AttentionItem[] {
   const items: AttentionItem[] = []
+  if (c.unread && c.unread > 0) {
+    items.push({ title: `${c.unread} unread ${c.unread === 1 ? 'message' : 'messages'}`, detail: 'From the Hire me form. Reply by email from the inbox.', pill: 'Unread', tone: 'hue', action: 'Read messages', href: '/messages' })
+  }
   for (const k of overdueCourses(c.courses, today)) {
     items.push({ title: `${short(k.title)} passed its target`, detail: `Target was ${fmtMonth(k.estimated_completion)}. Progress is ${k.progress}%.`, pill: 'Overdue', tone: 'draft', action: 'Update progress', href: '/learning' })
   }

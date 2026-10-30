@@ -1,6 +1,10 @@
 /**
  * QA acceptance: analytics. plan T7; H-1, H-15.
+ * Updated by the backend Developer for H-23 (2026-10-30): averages are over
+ * views with a measured time, new summary keys, page-until-empty reads, and
+ * /track needs a browser User-Agent (empty or bot UAs are dropped with 204).
  */
+const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 import request from 'supertest'
 import { mockServices, authHeader, VIEWER_TOKEN } from '../../../test/supabaseMock'
 import { buildApp, expectInvalid, silenceConsole } from '../../../test/acceptanceApp'
@@ -60,7 +64,7 @@ describe('QA analytics summary (H-1)', () => {
     const res = await request(app).get('/api/analytics/summary').set(authHeader())
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
-    expect(Object.keys(res.body.data).sort()).toEqual(['avgSecondsPerView', 'daily', 'generatedAt', 'pageViews', 'pages', 'range', 'referrers', 'visits'])
+    expect(Object.keys(res.body.data).sort()).toEqual(['avgSecondsPerView', 'campaigns', 'daily', 'generatedAt', 'measuredViews', 'pageViews', 'pages', 'range', 'referrers', 'trackingVersionSince', 'visits'])
     expect(res.body.data.range).toEqual({ from: ymd(todayStart() - 29 * DAY), to: ymd(todayStart()), days: 30 })
     expect(new Date(res.body.data.generatedAt).toString()).not.toBe('Invalid Date')
   })
@@ -82,7 +86,8 @@ describe('QA analytics summary (H-1)', () => {
     const d = (await request(app).get('/api/analytics/summary').set(authHeader())).body.data
     expect(d.visits).toBe(10) // s1..s8 + 2 null rows
     expect(d.pageViews).toBe(12)
-    expect(d.avgSecondsPerView).toBe(Math.round(120 / 12))
+    expect(d.measuredViews).toBe(4)
+    expect(d.avgSecondsPerView).toBe(Math.round(120 / 4)) // H-23: over measured views only
   })
 
   it('referrers: per visit from the first row, host only without www, Direct bucket, desc, sum === visits', async () => {
@@ -99,11 +104,11 @@ describe('QA analytics summary (H-1)', () => {
 
   it('pages: views desc, title = latest non-empty, avgSeconds per path', async () => {
     const d = (await request(app).get('/api/analytics/summary').set(authHeader())).body.data
-    expect(d.pages[0]).toEqual({ path: '/', title: 'Home', views: 6, avgSeconds: Math.round(40 / 6) })
+    expect(d.pages[0]).toEqual({ path: '/', title: 'Home', views: 6, measuredViews: 2, avgSeconds: Math.round(40 / 2) })
     const views = d.pages.map((p: any) => p.views)
     expect([...views].sort((a, b) => b - a)).toEqual(views)
     const about = d.pages.find((p: any) => p.path === '/about')
-    expect(about).toEqual({ path: '/about', title: 'About', views: 1, avgSeconds: 20 })
+    expect(about).toEqual({ path: '/about', title: 'About', views: 1, measuredViews: 1, avgSeconds: 20 })
     expect(d.pages.find((p: any) => p.path === '/blog').title).toBeNull()
   })
 
@@ -130,7 +135,7 @@ describe('QA analytics summary (H-1)', () => {
     const d = (await request(buildApp()).get('/api/analytics/summary').set(authHeader())).body.data
     expect(d.visits).toBe(1500)
     const ranges = db.callsFor('analytics', 'select').map((c) => c.range)
-    expect(ranges).toEqual([[0, 999], [1000, 1999]])
+    expect(ranges).toEqual([[0, 999], [1000, 1999], [1500, 2499]]) // H-23: pages until an empty page
   })
 
   it('no token → 401; non-admin → 403', async () => {
@@ -161,7 +166,7 @@ describe('QA analytics track (T7, H-15)', () => {
   afterEach(() => jest.restoreAllMocks())
 
   it('stores page_title and an anonymised IP', async () => {
-    const res = await request(app).post('/api/analytics/track').set('X-Forwarded-For', '203.0.113.77')
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', BROWSER_UA).set('X-Forwarded-For', '203.0.113.77')
       .send({ page_path: '/about', session_id: 's1', page_title: 'About · Demi' })
     expect(res.status).toBe(200)
     const p = db.callsFor('analytics', 'insert')[0].payload
@@ -171,21 +176,21 @@ describe('QA analytics track (T7, H-15)', () => {
   })
 
   it('text/plain JSON body (sendBeacon) → 200 and stored', async () => {
-    const res = await request(app).post('/api/analytics/track').set('Content-Type', 'text/plain')
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', BROWSER_UA).set('Content-Type', 'text/plain')
       .send(JSON.stringify({ page_path: '/', session_id: 's2', page_title: 'Home' }))
     expect(res.status).toBe(200)
     expect(db.callsFor('analytics', 'insert')[0].payload).toEqual(expect.objectContaining({ page_path: '/', session_id: 's2', page_title: 'Home' }))
   })
 
   it('text/plain "not json" → 400', async () => {
-    const res = await request(app).post('/api/analytics/track').set('Content-Type', 'text/plain').send('not json')
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', BROWSER_UA).set('Content-Type', 'text/plain').send('not json')
     expect(res.status).toBe(400)
     expect(res.body.success).toBe(false)
     expect(db.callsFor('analytics', 'insert')).toHaveLength(0)
   })
 
   it('missing page_path → 400 with the shared details shape [{path,msg}]', async () => {
-    const res = await request(app).post('/api/analytics/track').send({ session_id: 's' })
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', BROWSER_UA).send({ session_id: 's' })
     expect(res.status).toBe(400)
     expect(res.body.error).toBe('Invalid input')
     for (const d of res.body.details) expect(Object.keys(d).sort()).toEqual(['msg', 'path'])
@@ -194,7 +199,7 @@ describe('QA analytics track (T7, H-15)', () => {
   it('duration update on the same session+path also stores page_title', async () => {
     db = mockServices({ tables: { analytics: [view('s9', '/x', at(0), { page_title: null })] } })
     app = buildApp()
-    await request(app).post('/api/analytics/track').send({ page_path: '/x', session_id: 's9', visit_duration: 42, page_title: 'X page' })
+    await request(app).post('/api/analytics/track').set('User-Agent', BROWSER_UA).send({ page_path: '/x', session_id: 's9', visit_duration: 42, page_title: 'X page' })
     const upd = db.callsFor('analytics', 'update')[0].payload
     expect(upd).toEqual(expect.objectContaining({ visit_duration: 42, page_title: 'X page' }))
   })

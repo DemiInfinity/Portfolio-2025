@@ -71,7 +71,8 @@ Feature: Blog list and post (F-16, F-17, H-14)
     Then the clipboard received "SITE/blog/shipping-a-desktop-app"
     And the toast says "Link copied to your clipboard"
 
-  Scenario: F-17 AC4 sparkle survives a reload
+  Scenario: F-17 AC4 sparkle survives a reload (preferences allowed)
+    Given the visitor has already chosen analytics "off" and preferences "on"
     When the visitor opens "/blog/shipping-a-desktop-app"
     And the visitor clicks the sparkle button
     Then the sparkle button is pressed and reads "Sparkle sent"

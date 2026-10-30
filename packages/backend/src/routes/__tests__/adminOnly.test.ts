@@ -5,7 +5,7 @@ import { mockServices, authHeader, VIEWER_TOKEN } from '../../test/supabaseMock'
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }))
 
-type Method = 'get' | 'post' | 'put' | 'delete'
+type Method = 'get' | 'post' | 'put' | 'patch' | 'delete'
 
 /** Every route that writes, or reads admin-only data. Add new admin routes here. */
 const ADMIN_ROUTES: [Method, string][] = [
@@ -49,6 +49,9 @@ const ADMIN_ROUTES: [Method, string][] = [
   ['get', '/api/analytics/summary'],
   ['get', '/api/contact'],
   ['put', '/api/contact/1'],
+  ['patch', '/api/contact/1'],
+  ['delete', '/api/contact/1'],
+  ['get', '/api/contact/unread-count'],
   ['put', '/api/content/about'],
   ['post', '/api/recommendations'],
   ['put', '/api/recommendations/1'],

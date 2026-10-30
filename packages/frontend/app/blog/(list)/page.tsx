@@ -17,3 +17,4 @@ export default async function Blog() {
   const posts = await fetchBlogPosts({ limit: 100 })
   return <BlogClient posts={posts} />
 }
+

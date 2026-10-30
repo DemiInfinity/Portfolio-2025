@@ -3,6 +3,8 @@ import express from 'express'
 import router from '../analytics'
 import { mockServices, authHeader, VIEWER_TOKEN } from '../../test/supabaseMock'
 
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+
 describe('Analytics API', () => {
   let app: express.Application
   let db: ReturnType<typeof mockServices>
@@ -28,7 +30,7 @@ describe('Analytics API', () => {
     const res = await request(app).get('/api/analytics/summary').set(authHeader())
     expect(res.status).toBe(200)
     const d = res.body.data
-    expect(Object.keys(d).sort()).toEqual(['avgSecondsPerView', 'daily', 'generatedAt', 'pageViews', 'pages', 'range', 'referrers', 'visits'])
+    expect(Object.keys(d).sort()).toEqual(['avgSecondsPerView', 'campaigns', 'daily', 'generatedAt', 'measuredViews', 'pageViews', 'pages', 'range', 'referrers', 'trackingVersionSince', 'visits'])
     expect(d.daily).toHaveLength(30)
     expect(d.daily[29].date).toBe(new Date().toISOString().slice(0, 10))
     for (let i = 1; i < 30; i++) {
@@ -59,26 +61,26 @@ describe('Analytics API', () => {
     db = mockServices({ tables: { analytics: many } })
     const res = await request(app).get('/api/analytics/summary?days=1').set(authHeader())
     expect(res.body.data.pageViews).toBe(2500)
-    expect(db.callsFor('analytics', 'select').map((c) => c.range)).toEqual([[0, 999], [1000, 1999], [2000, 2999]])
+    expect(db.callsFor('analytics', 'select').map((c) => c.range)).toEqual([[0, 999], [1000, 1999], [2000, 2999], [2500, 3499]])
   })
 
   it('POST /track stores page_title', async () => {
-    const res = await request(app).post('/api/analytics/track').send({ page_path: '/', session_id: 'new', page_title: 'Home' })
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', UA).send({ page_path: '/', session_id: 'new', page_title: 'Home' })
     expect(res.status).toBe(200)
     expect(db.callsFor('analytics', 'insert')[0].payload).toMatchObject({ page_title: 'Home', page_path: '/', event_type: 'page_view' })
   })
 
   it('POST /track accepts a text/plain JSON body (sendBeacon); rejects non-JSON text', async () => {
-    const ok = await request(app).post('/api/analytics/track').set('Content-Type', 'text/plain')
+    const ok = await request(app).post('/api/analytics/track').set('User-Agent', UA).set('Content-Type', 'text/plain')
       .send(JSON.stringify({ page_path: '/', session_id: 'beacon', page_title: 'Home' }))
     expect(ok.status).toBe(200)
     expect(db.callsFor('analytics', 'insert')[0].payload.session_id).toBe('beacon')
-    const bad = await request(app).post('/api/analytics/track').set('Content-Type', 'text/plain').send('not json')
+    const bad = await request(app).post('/api/analytics/track').set('User-Agent', UA).set('Content-Type', 'text/plain').send('not json')
     expect(bad.status).toBe(400)
   })
 
   it('POST /track with duration updates the existing visit and its title', async () => {
-    const res = await request(app).post('/api/analytics/track').send({ page_path: '/', session_id: 's1', visit_duration: 42, page_title: 'Home!' })
+    const res = await request(app).post('/api/analytics/track').set('User-Agent', UA).send({ page_path: '/', session_id: 's1', visit_duration: 42, page_title: 'Home!' })
     expect(res.status).toBe(200)
     expect(db.callsFor('analytics', 'update')[0].payload).toMatchObject({ visit_duration: 42, page_title: 'Home!' })
   })

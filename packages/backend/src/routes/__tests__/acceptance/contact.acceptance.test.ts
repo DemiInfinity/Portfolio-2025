@@ -30,7 +30,7 @@ describe('QA contact', () => {
 
   const send = (body: any, ip = '198.51.100.23') => request(app).post('/api/contact').set('X-Forwarded-For', ip).send(body)
 
-  it('valid → 201 {success, data:{id, received_at}}; insert has kind/name/email/message/source_path; IP anonymised', async () => {
+  it('valid → 201 {success, data:{id, received_at}}; insert has kind/name/email/message/source_path; no IP or UA stored (D-10)', async () => {
     const res = await send(valid)
     expect(res.status).toBe(201)
     expect(res.body.success).toBe(true)
@@ -38,9 +38,9 @@ describe('QA contact', () => {
     expect(new Date(res.body.data.received_at).toString()).not.toBe('Invalid Date')
     const p = db.callsFor('contact_messages', 'insert')[0].payload
     expect(p).toEqual(expect.objectContaining({ kind: 'role', name: 'Ada', email: 'ada@example.com', message: 'Hello there', source_path: '/about' }))
-    expect(p.ip_address).toBeDefined()
-    expect(p.ip_address).not.toBe('198.51.100.23')
-    expect(p.ip_address).toMatch(/^198\.51\.100\.0$/)
+    // D-10 (2026-10-30): IP address and user agent are no longer stored.
+    expect(p).not.toHaveProperty('ip_address')
+    expect(p).not.toHaveProperty('user_agent')
   })
 
   it('blank name → 201, stored ""', async () => {
@@ -201,7 +201,8 @@ describe('QA contact', () => {
       const res = await request(app).get('/api/contact?status=new&limit=50').set(authHeader())
       expect(res.status).toBe(200)
       expect(res.body.data.map((m: any) => m.id)).toEqual([1])
-      expect(Object.keys(res.body.data[0]).sort()).toEqual(['created_at', 'email', 'email_status', 'id', 'kind', 'message', 'name', 'source_path', 'status'])
+      // H-24 (2026-10-30) adds `read`; still no IP or user agent.
+      expect(Object.keys(res.body.data[0]).sort()).toEqual(['created_at', 'email', 'email_status', 'id', 'kind', 'message', 'name', 'read', 'source_path', 'status'])
     })
 
     it('PUT /api/contact/:id {status:"read"} → 200; invalid status → 400', async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, waitFor, act } from '@testing-library/react'
+import { screen, waitFor, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Settings from '../Settings'
 import { renderApp } from '@/test/utils'
@@ -130,5 +130,14 @@ describe('Settings', () => {
     await waitFor(() => expect(refreshUser).toHaveBeenCalled())
     expect(api.put).toHaveBeenCalledWith('/auth/profile', { name: 'Demi Taylor Nimmo', email: 'me@example.com' })
     expect(await screen.findByText('Saved')).toBeInTheDocument()
+  })
+
+  it('links to the site with ?exclude_me=1 in a new tab to stop counting this browser', async () => {
+    renderApp(<Settings />)
+    const region = await screen.findByRole('region', { name: "Don't count my own visits" })
+    const link = within(region).getByRole('link', { name: 'Open the site and stop counting this browser' })
+    expect(link).toHaveAttribute('href', 'https://www.demitaylornimmo.com/?exclude_me=1')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(region).toHaveTextContent("Do it again after clearing this browser's data")
   })
 })

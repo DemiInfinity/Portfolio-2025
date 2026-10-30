@@ -17,6 +17,8 @@ import Icon from '@/components/ui/Icon'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { ImageUploadButton } from '@/components/ImageUploadButton'
+import ShareLinkedInDialog, { ShareButton } from '@/components/ShareLinkedIn'
+import type { ShareItem } from '@/lib/share'
 
 export interface BlogPost {
   id: number
@@ -86,7 +88,7 @@ const toBody = (d: Draft) => ({
 
 const PATH: Record<string, keyof Draft> = { title: 'title', slug: 'slug', excerpt: 'excerpt', content: 'content', category: 'category', read_time: 'mins', tags: 'tags', author: 'author', publish_date: 'date', cover_image: 'cover' }
 
-const GRID = 'minmax(0, 1fr) 120px 100px 120px 80px'
+const GRID = 'minmax(0, 1fr) 120px 100px 120px auto'
 
 export default function Blog() {
   const qc = useQueryClient()
@@ -102,6 +104,7 @@ export default function Blog() {
   const [tried, setTried] = useState(false)
   const [serverErr, setServerErr] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
+  const [sharing, setSharing] = useState<ShareItem | null>(null)
 
   const open = (p: BlogPost | null) => {
     setEditId(p ? p.id : 'new')
@@ -257,7 +260,12 @@ export default function Blog() {
                 </span>
                 <span className="hide-sm" style={{ fontSize: 13, color: p.featured ? '#4c1d95' : '#615a6c' }}>{p.featured ? 'Featured' : '—'}</span>
                 <span className="right num mute hide-sm" style={{ fontSize: 13 }}>{fmtDay(p.publish_date)}</span>
-                <button type="button" className="btn btn-text right" onClick={() => open(p)} aria-label={`Edit ${p.title}`}>Edit</button>
+                <div className="right" style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                  {p.published ? (
+                    <ShareButton title={p.title} onClick={() => setSharing({ kind: 'post', title: p.title, slug: p.slug, summary: p.excerpt || '', tags: p.tags, image: p.cover_image || null })} />
+                  ) : null}
+                  <button type="button" className="btn btn-text" onClick={() => open(p)} aria-label={`Edit ${p.title}`}>Edit</button>
+                </div>
               </li>
             ))}
           </ul>
@@ -354,6 +362,8 @@ export default function Blog() {
           </div>
         </Dialog>
       ) : null}
+
+      {sharing ? <ShareLinkedInDialog item={sharing} onClose={() => setSharing(null)} /> : null}
 
       {confirming && typeof editId === 'number' ? (
         <ConfirmDialog

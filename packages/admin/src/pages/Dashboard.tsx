@@ -5,6 +5,7 @@ import { computeAttention, finding } from '@/lib/attention'
 import { isBuilding, rebuiltLabel, useCvStatus, useRegenerateCv } from '@/lib/cv'
 import { fmtDay, plural } from '@/lib/format'
 import { useFlags } from '@/lib/flags'
+import { useUnreadCount } from '@/lib/messages'
 import { SITE_URL } from '@/lib/config'
 import { PROJECTS_KEY, fetchProjects } from '@/lib/projects'
 import { BLOG_KEY, fetchPosts, publishedNewestFirst } from './Blog'
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const skills = useQuery({ queryKey: SKILLS_KEY, queryFn: fetchSkills })
   const flags = useFlags()
   const cv = useCvStatus()
+  const unread = useUnreadCount()
   const regen = useRegenerateCv(say)
   const { toggle, confirm } = useFlagToggle()
 
@@ -49,7 +51,7 @@ export default function Dashboard() {
   const avg = C.length ? Math.round(C.reduce((a, c) => a + c.progress, 0) / C.length) : 0
 
   const ready = !!(posts.data && learning.data && certs.data)
-  const input = { courses: C, cv: cv.data, certCount, latestPost: latest }
+  const input = { courses: C, cv: cv.data, certCount, latestPost: latest, unread: unread.data ?? 0 }
   const todo = ready ? computeAttention(input, today) : []
   const v = (loaded: unknown, value: string) => (loaded ? value : '–')
 

@@ -167,3 +167,26 @@ Then('the hero illustration is at least {int}px wide and tall', (px: number) => 
     expect(r.height, 'height').to.be.gte(px)
   })
 })
+
+// ---- loader race diagnosis (F-9) ----
+Given('the browser holds route prefetches of {string} for {int} ms', (path: string, ms: number) => {
+  cy.intercept({ method: 'GET', pathname: path }, (req) => {
+    const prefetch = Boolean(req.headers['next-router-prefetch'] || req.headers['next-router-segment-prefetch'])
+    if (prefetch) req.on('response', (res) => res.setDelay(ms))
+  }).as('rscPrefetch')
+})
+
+When('the visitor waits until the route {string} has been prefetched', (path: string) => {
+  cy.intercept({ method: 'GET', pathname: path, headers: { 'next-router-prefetch': '1' } }).as('donePrefetch')
+  cy.get('footer').scrollIntoView()
+  cy.wait('@donePrefetch', { timeout: 10000 })
+  cy.wait(300)
+})
+
+Then('the main landmark is never empty while {string} loads', (path: string) => {
+  cy.location('pathname', { timeout: 3000 }).should('eq', path)
+  cy.get('main', { timeout: 3000 }).should(($m) => {
+    const html = $m[0].innerHTML
+    expect($m[0].querySelector('[role="status"]'), `loader in main; main has ${$m[0].children.length} children, html: ${html.slice(0, 300)}`).to.exist
+  })
+})

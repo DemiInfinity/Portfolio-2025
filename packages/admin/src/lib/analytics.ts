@@ -7,8 +7,14 @@ export type Summary = {
   pageViews: number
   avgSecondsPerView: number
   daily: { date: string; visits: number }[]
-  pages: { path: string; title: string | null; views: number; avgSeconds: number }[]
+  pages: { path: string; title: string | null; views: number; avgSeconds: number; measuredViews?: number }[]
   referrers: { source: string; visits: number }[]
+  /** H-23: page views with a measured duration (> 0); the average divides by this. */
+  measuredViews?: number
+  /** H-23: one row per visit that arrived with UTM values. */
+  campaigns?: { source: string | null; medium: string | null; campaign: string | null; visits: number }[]
+  /** H-23: YYYY-MM-DD when v2 counting started. */
+  trackingVersionSince?: string
 }
 
 const n = (v: number) => v.toLocaleString('en-GB')
@@ -67,7 +73,13 @@ export function buildAnalytics(s: Summary, q = '') {
   const kpis = [
     { label: 'Visits', value: n(s.visits), unit: '', caption: `${days ? Math.round(s.visits / days) : 0} a day on average` },
     { label: 'Page views', value: n(s.pageViews), unit: '', caption: `${(s.visits ? s.pageViews / s.visits : 0).toFixed(2)} pages per visit` },
-    { label: 'Average time on a page', value: String(Math.floor(s.avgSecondsPerView / 60)), unit: `m ${String(s.avgSecondsPerView % 60).padStart(2, '0')} s`, caption: 'Weighted by views' },
+    {
+      label: 'Average time on a page',
+      value: String(Math.floor(s.avgSecondsPerView / 60)),
+      unit: `m ${String(s.avgSecondsPerView % 60).padStart(2, '0')} s`,
+      // H-23: the average uses only views with a measured time.
+      caption: typeof s.measuredViews === 'number' ? `Based on ${n(s.measuredViews)} ${s.measuredViews === 1 ? 'view' : 'views'} with a measured time` : 'Weighted by views',
+    },
     post
       ? { label: 'Most read post', value: n(post.views), unit: 'views', caption: `${pageName(post)}, ${mmss(post.avgSeconds)} a read` }
       : { label: 'Most read post', value: '0', unit: 'views', caption: 'No post views yet' },
@@ -111,8 +123,26 @@ export function buildAnalytics(s: Summary, q = '') {
   const first = refRows[0]?.visits || 1
   const referrers = refRows.map((r, k) => ({ name: r.source, visits: n(r.visits), share: pct1(r.visits, refTotal), w: (r.visits / first) * 88 + '%', top: k === 0 }))
 
+  // H-23: figures before v2 counting over-count visits and under-count time.
+  const since = s.trackingVersionSince && /^\d{4}-\d{2}-\d{2}/.test(s.trackingVersionSince) ? s.trackingVersionSince.slice(0, 10) : null
+  const countingNote = since && s.range.from < since ? `Counting changed on ${fmtDay(since)}: earlier figures over-counted visits and under-counted time.` : null
+
+  const camps = (s.campaigns || []).filter((c) => c.visits > 0).slice().sort((a, b) => b.visits - a.visits)
+  const campTotal = camps.reduce((a, c) => a + c.visits, 0)
+  const campaigns = camps.map((c, k) => ({
+    key: `${c.source}|${c.medium}|${c.campaign}|${k}`,
+    name: c.campaign || 'No campaign name',
+    detail: [c.source, c.medium].filter(Boolean).join(' · ') || 'No source',
+    visits: n(c.visits),
+    share: pct1(c.visits, s.visits || campTotal),
+    w: (c.visits / (camps[0]?.visits || 1)) * 88 + '%',
+    top: k === 0,
+  }))
+
   return {
     sub,
+    countingNote,
+    campaigns,
     kpis,
     ticks,
     bars,

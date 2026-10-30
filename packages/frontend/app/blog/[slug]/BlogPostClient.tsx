@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import Markdown from '@/components/Markdown'
+import ShareMenu, { SHARE_COPY_FAILED, copyToClipboard } from '@/components/ShareMenu'
 import Spark from '@/components/ui/Spark'
 import { Tag } from '@/components/ui/Chip'
 import { useToast } from '@/components/ui/Toast'
@@ -13,20 +14,13 @@ import { resolveMediaUrl } from '@/lib/mediaUrl'
 import { postDate, postTags, readTime } from '@/lib/selectors'
 import { author as authorCopy } from '@/lib/content/site'
 import { useLocalStorage } from '@/lib/useClientStore'
+import { useConsent } from '@/components/consent/useConsent'
 
 export const LINK_COPIED = 'Link copied to your clipboard'
 export const sparkleKey = (slug: string) => `post_sparkle:${slug}`
 
 const delay = (ms: number) => ({ ['--d' as string]: `${ms}ms` }) as CSSProperties
 
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    return false
-  }
-}
 
 function LinkIcon() {
   return (
@@ -43,7 +37,9 @@ export default function BlogPostClient({ post, url, keepReading = [] }: { post: 
   // Q7: remembered per slug in this browser only; if storage is blocked it lasts for this visit.
   const [stored, setStored] = useLocalStorage(sparkleKey(post.slug))
   const [local, setLocal] = useState<boolean | null>(null)
-  const sparkled = local ?? stored === '1'
+  // A remembered sparkle is a preference: stored only with preference consent.
+  const prefsAllowed = useConsent()?.prefs === true
+  const sparkled = local ?? (prefsAllowed && stored === '1')
   const [burst, setBurst] = useState(false)
   const cover = resolveMediaUrl(post.cover_image)
   const tags = postTags(post)
@@ -59,27 +55,15 @@ export default function BlogPostClient({ post, url, keepReading = [] }: { post: 
   }, [burst])
 
   const copyLink = async () => {
-    await copyText(url)
-    toast.show(LINK_COPIED)
-  }
-
-  const share = async () => {
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({ title: post.title, url })
-        return
-      } catch (error) {
-        if ((error as { name?: string })?.name === 'AbortError') return
-      }
-    }
-    await copyLink()
+    const ok = await copyToClipboard(url)
+    toast.show(ok ? LINK_COPIED : SHARE_COPY_FAILED, ok ? 'info' : 'error')
   }
 
   const toggleSparkle = () => {
     const next = !sparkled
     setLocal(next)
     setBurst(next)
-    setStored(next ? '1' : null)
+    if (prefsAllowed) setStored(next ? '1' : null)
   }
 
   return (
@@ -103,10 +87,13 @@ export default function BlogPostClient({ post, url, keepReading = [] }: { post: 
                 <p style={{ fontSize: 'var(--t-sm)' }}>{authorCopy.role}</p>
               </div>
             </div>
-            <button type="button" className="btn btn-soft post-btn" onClick={copyLink}>
-              <LinkIcon />
-              Copy link
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="btn btn-soft post-btn" onClick={copyLink}>
+                <LinkIcon />
+                Copy link
+              </button>
+              <ShareMenu url={url} title={post.title} label="Share this post" descriptions />
+            </div>
           </div>
         </header>
 
@@ -134,9 +121,7 @@ export default function BlogPostClient({ post, url, keepReading = [] }: { post: 
                 <Spark size={18} />
                 {sparkled ? 'Sparkle sent' : 'Send a sparkle'}
               </button>
-              <button type="button" className="btn btn-soft post-btn" onClick={share}>
-                Share
-              </button>
+              <ShareMenu url={url} title={post.title} label="Share this post" descriptions up />
             </div>
           </div>
         </div>

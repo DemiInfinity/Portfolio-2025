@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useSitePathname } from './SitePathname'
 import { contact } from '@/lib/content/site'
+import { openCookieSettings } from '@/lib/consent'
 
 const LINKS = [
   { label: 'Home', href: '/' },
@@ -19,7 +20,7 @@ const LINKS = [
 
 /** Footer from Main: logo, links (minus the current page), copyright. */
 export default function Footer() {
-  const pathname = usePathname() || '/'
+  const pathname = useSitePathname() || '/'
   const year = new Date().getFullYear()
   const links = LINKS.filter((link) => link.href !== pathname)
 
@@ -39,6 +40,9 @@ export default function Footer() {
             </Link>
           )
         )}
+        <button type="button" className="footer-settings" onClick={openCookieSettings}>
+          Cookie settings
+        </button>
       </nav>
       <span>© {year} Demi Taylor Nimmo</span>
     </footer>

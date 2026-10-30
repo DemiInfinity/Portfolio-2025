@@ -111,6 +111,7 @@ Feature: Home page (F-11, F-9, D-3, D-6 badge, D-8 Download CV)
 
   Scenario: show_colourways on: a remembered colourway is restored on Home
     Given the site flag "show_colourways" is on
+    And the visitor has already chosen analytics "off" and preferences "on"
     And the visitor has "home_colourway" set to "Rose" in localStorage
     When the visitor opens "/"
     Then the swatch "Rose" is pressed

@@ -68,6 +68,8 @@ export default function Analytics() {
     <>
       {head(vm.sub, stamp(data.generatedAt))}
 
+      {vm.countingNote ? <p className="mute" data-testid="counting-note" style={{ fontSize: 13, marginTop: -12 }}>{vm.countingNote}</p> : null}
+
       <div className="card kpis" style={{ ['--n' as string]: 4 }}>
         {vm.kpis.map((k) => (
           <div key={k.label} className="kpi">
@@ -157,6 +159,28 @@ export default function Analytics() {
             ) : <p className="mute" style={{ padding: '10px 0' }}>No visits yet.</p>}
             {vm.refMatches && vm.referrers.length ? <p className="mute num" style={{ fontSize: 12, marginTop: 8 }}>{vm.refTotal} visits in total, the same as the chart.</p> : null}
           </div>
+          {vm.campaigns.length ? (
+            <section aria-labelledby="an-camp-h" style={{ marginTop: 24 }}>
+              <h2 id="an-camp-h" className="rail-h">Campaigns</h2>
+              <div className="card card-pad" style={{ paddingTop: 8, paddingBottom: 12 }}>
+                <ul className="blist">
+                  {vm.campaigns.map((c) => (
+                    <li key={c.key}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ fontWeight: c.top ? 600 : 400, display: 'block' }}>{c.name}</span>
+                          <span className="mute" style={{ fontSize: 12 }}>{c.detail}</span>
+                        </span>
+                        <span className="num" style={{ whiteSpace: 'nowrap' }}>{c.visits} <span className="mute" style={{ fontSize: 12 }}>{c.share}</span></span>
+                      </div>
+                      <div className={'bl-bar' + (c.top ? ' top' : '')} style={{ width: c.w }} />
+                    </li>
+                  ))}
+                </ul>
+                <p className="mute" style={{ fontSize: 12, marginTop: 8 }}>Visits that arrived through a tagged link (UTM).</p>
+              </div>
+            </section>
+          ) : null}
         </section>
       </div>
     </>

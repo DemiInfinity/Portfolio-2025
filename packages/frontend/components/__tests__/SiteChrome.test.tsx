@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react'
 import SiteChrome from '../SiteChrome'
 import AnalyticsProvider from '../AnalyticsProvider'
 import { matchesRoute, MAINTENANCE_EXEMPT } from '@/lib/routes'
+import { resetConsentMemory, saveConsent } from '@/lib/consent'
 
 const pathname = vi.hoisted(() => ({ value: '/' }))
 const track = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }))
-vi.mock('@/lib/analytics', () => ({ default: { trackPageView: track } }))
+vi.mock('@/lib/analytics', () => ({ default: { trackPageView: track, reset: vi.fn() }, applyExcludeParam: vi.fn() }))
 
 beforeEach(() => {
   track.mockClear()
@@ -35,12 +36,15 @@ describe('SiteChrome', () => {
   })
 
   it('does not track /cv page views', () => {
+    saveConsent({ analytics: true, prefs: false })
     pathname.value = '/cv'
     render(<AnalyticsProvider>x</AnalyticsProvider>)
     expect(track).not.toHaveBeenCalled()
     pathname.value = '/about'
     render(<AnalyticsProvider>x</AnalyticsProvider>)
     expect(track).toHaveBeenCalledWith('/about')
+    window.localStorage.clear()
+    resetConsentMemory()
   })
 
   it('keeps legal pages and the CV out of maintenance mode', () => {

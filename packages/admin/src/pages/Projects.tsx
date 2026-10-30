@@ -18,6 +18,8 @@ import { SkeletonRows } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { ImageUploadButton } from '@/components/ImageUploadButton'
 import CaseStudyEditor from '@/components/project/CaseStudyEditor'
+import ShareLinkedInDialog, { ShareButton } from '@/components/ShareLinkedIn'
+import type { ShareItem } from '@/lib/share'
 
 const STATUS: Record<ProjectStatus, [string, string]> = {
   in_development: ['In development', 'p-hue'],
@@ -61,7 +63,7 @@ export const toProjectBody = (d: Draft, caseStudy: object | null) => ({
 const PATH: Record<string, keyof Draft> = { title: 'title', slug: 'slug', description: 'description', status: 'status', image: 'image', images: 'gallery', inspiration: 'inspiration', technologies: 'techText', github_url: 'github', live_url: 'live', date: 'date', role: 'role', platform: 'platform' }
 
 type Filter = 'all' | ProjectStatus
-const GRID = 'minmax(0, 1fr) 140px minmax(0, 300px) 100px 80px'
+const GRID = 'minmax(0, 1fr) 140px minmax(0, 300px) 100px auto'
 
 export default function Projects() {
   const qc = useQueryClient()
@@ -81,6 +83,7 @@ export default function Projects() {
   const [caseServerErr, setCaseServerErr] = useState<Record<string, string>>({})
   const [confirming, setConfirming] = useState(false)
   const [opening, setOpening] = useState<number | null>(null)
+  const [sharing, setSharing] = useState<ShareItem | null>(null)
 
   const reset = () => {
     setTab('details')
@@ -261,7 +264,12 @@ export default function Projects() {
                     {p.technologies.length > 3 ? <span className="mute" style={{ fontSize: 12, alignSelf: 'center', whiteSpace: 'nowrap' }}>+{p.technologies.length - 3}</span> : null}
                   </div>
                   <span className="hide-sm" style={{ fontSize: 13, color: p.featured ? '#4c1d95' : '#615a6c' }}>{p.featured ? 'Featured' : '—'}</span>
-                  <button type="button" className="btn btn-text right" onClick={() => open(p)} disabled={opening === p.id} aria-label={`Edit ${p.title}`}>Edit</button>
+                  <div className="right" style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                    {isPublic(p) && p.slug ? (
+                      <ShareButton title={p.title} onClick={() => setSharing({ kind: 'project', title: p.title, slug: p.slug!, summary: p.description || '', tags: p.technologies, image: p.image || null })} />
+                    ) : null}
+                    <button type="button" className="btn btn-text" onClick={() => open(p)} disabled={opening === p.id} aria-label={`Edit ${p.title}`}>Edit</button>
+                  </div>
                 </li>
               )
             })}
@@ -359,6 +367,8 @@ export default function Projects() {
           </div>
         </Dialog>
       ) : null}
+
+      {sharing ? <ShareLinkedInDialog item={sharing} onClose={() => setSharing(null)} /> : null}
 
       {confirming && typeof editId === 'number' ? (
         <ConfirmDialog

@@ -4,6 +4,7 @@ import ProjectDetailsClient from '../project-details-client'
 import { fetchProjectById, fetchProjectBySlug, fetchProjects } from '@/lib/api'
 import type { Project } from '@/lib/api'
 import { nextProject } from '@/lib/selectors'
+import { DEFAULT_OG_IMAGE, siteUrl } from '@/lib/siteUrl'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface PageProps {
@@ -23,7 +24,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const title = `${project.title} | Projects`
   const description = project.description || undefined
-  const image = project.image ? resolveMediaUrl(project.image) : undefined
+  const url = siteUrl(`/projects/${project.slug || slug}`)
+  // LinkedIn builds its preview from og:image; fall back to the site default (1200×630).
+  const image = project.image ? resolveMediaUrl(project.image) : siteUrl(DEFAULT_OG_IMAGE)
+  const imageMeta = project.image
+    ? { url: image, alt: project.title }
+    : { url: image, alt: 'Demi Taylor Nimmo, full-stack software engineer', width: 1200, height: 630 }
 
   return {
     title,
@@ -35,13 +41,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       type: 'article',
-      ...(image ? { images: [{ url: image, alt: project.title }] } : {}),
+      url,
+      siteName: 'Demi Taylor Nimmo',
+      images: [imageMeta],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: [image],
     },
   }
 }
@@ -66,14 +74,13 @@ export default async function ProjectPage({ params }: PageProps) {
     const byId = await fetchProjectById(slug)
     if (!byId) notFound()
     if (byId.slug) redirect(`/projects/${byId.slug}`)
-    return <ProjectDetailsClient project={byId} next={await loadNext(byId.slug)} />
+    return <ProjectDetailsClient project={byId} next={await loadNext(byId.slug)} url={siteUrl(`/projects/${slug}`)} />
   }
 
   const project = await fetchProjectBySlug(slug)
   if (!project) notFound()
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'
-  const canonical = `${siteUrl.replace(/\/$/, '')}/projects/${project.slug || slug}`
+  const canonical = siteUrl(`/projects/${project.slug || slug}`)
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -91,7 +98,7 @@ export default async function ProjectPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ProjectDetailsClient project={project} next={await loadNext(project.slug || slug)} />
+      <ProjectDetailsClient project={project} next={await loadNext(project.slug || slug)} url={canonical} />
     </>
   )
 }

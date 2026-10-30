@@ -4,6 +4,7 @@ export type NavItem = { label: string; path: string; icon: IconName; placeholder
 
 export const NAV: NavItem[] = [
   { label: 'Dashboard', path: '/', icon: 'dashboard', placeholder: 'Search projects, posts and roles', group: 'top' },
+  { label: 'Messages', path: '/messages', icon: 'mail', placeholder: 'Search messages', group: 'top' },
   { label: 'About', path: '/about', icon: 'about', placeholder: 'Search recommendations', group: 'Content' },
   { label: 'Projects', path: '/projects', icon: 'projects', placeholder: 'Search projects', group: 'Content' },
   { label: 'Blog', path: '/blog', icon: 'blog', placeholder: 'Search posts', group: 'Content' },

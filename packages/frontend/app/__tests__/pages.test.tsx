@@ -10,6 +10,7 @@ import ProjectDetailsClient from '../projects/project-details-client'
 import ExperienceClient from '../experience/experience-client'
 import { OverlayProvider } from '@/components/overlays/OverlayProvider'
 import { ToastProvider } from '@/components/ui/Toast'
+import { saveConsent, resetConsentMemory } from '@/lib/consent'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 
@@ -94,12 +95,23 @@ describe('Home', () => {
     window.localStorage.removeItem('home_colourway')
   })
 
-  it('show_colourways on: a remembered colourway is restored', async () => {
+  it('show_colourways on: a remembered colourway is restored (with preference consent)', async () => {
+    saveConsent({ analytics: false, prefs: true })
     window.localStorage.setItem('home_colourway', 'Rose')
     wrap(<HomeClient projects={[]} showColourways />)
     expect(await screen.findByText('Colourway: Rose')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rose' })).toHaveAttribute('aria-pressed', 'true')
-    window.localStorage.removeItem('home_colourway')
+    window.localStorage.clear()
+    resetConsentMemory()
+  })
+
+  it('without preference consent the colourway works for the visit but is not stored', async () => {
+    window.localStorage.clear()
+    resetConsentMemory()
+    wrap(<HomeClient projects={[]} showColourways />)
+    await userEvent.click(screen.getByRole('button', { name: 'Rose' }))
+    expect(screen.getByText('Colourway: Rose')).toBeInTheDocument()
+    expect(window.localStorage.getItem('home_colourway')).toBeNull()
   })
 
   it('shows Retry when projects are unavailable', () => {
@@ -138,7 +150,7 @@ describe('Case study', () => {
   const base = project(1, 'lunalore', { title: 'LunaLore', technologies: ['Electron', 'Next.js'], date: '2025-03-01' })
 
   it('renders hero meta without missing items and only filled sections', async () => {
-    render(
+    wrap(
       <ProjectDetailsClient
         project={{
           ...base,
@@ -153,6 +165,7 @@ describe('Case study', () => {
           },
         } as any}
         next={{ ...project(2, 'inf'), title: 'Infinity Tracker' } as any}
+        url="https://demitaylornimmo.com/projects/lunalore"
       />
     )
     expect(screen.getByRole('heading', { level: 1, name: 'LunaLore' })).toBeInTheDocument()
@@ -183,7 +196,7 @@ describe('Case study', () => {
   })
 
   it('falls back to legacy Markdown content with a TOC', () => {
-    render(<ProjectDetailsClient project={{ ...base, case_study: null, content: '## Overview\ntext' } as any} />)
+    wrap(<ProjectDetailsClient project={{ ...base, case_study: null, content: '## Overview\ntext' } as any} url="https://demitaylornimmo.com/projects/lunalore" />)
     expect(document.getElementById('overview')).not.toBeNull()
     expect(within(screen.getByRole('navigation', { name: 'On this page' })).getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '#overview')
   })

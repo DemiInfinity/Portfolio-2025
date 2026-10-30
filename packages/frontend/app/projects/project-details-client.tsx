@@ -5,6 +5,7 @@ import Button from '@/components/ui/Button'
 import Spark from '@/components/ui/Spark'
 import Markdown, { extractToc } from '@/components/Markdown'
 import ProcessTabs from '@/components/case-study/ProcessTabs'
+import ShareMenu from '@/components/ShareMenu'
 import { caseStudyToc, normaliseCaseStudy } from '@/components/case-study/caseStudy'
 import { CASE_STUDY_HERO_ID } from '@/components/SiteHeader'
 import type { Project } from '@/lib/api'
@@ -25,7 +26,7 @@ function Section({ id, title, children, style }: { id: string; title?: string; c
   )
 }
 
-function Hero({ project }: { project: Project }) {
+function Hero({ project, url }: { project: Project; url: string }) {
   const technologies = Array.isArray(project.technologies) ? project.technologies : []
   const meta = [
     { label: 'Role', value: project.role },
@@ -52,6 +53,14 @@ function Hero({ project }: { project: Project }) {
         {project.description && (
           <p className="in" style={{ ...delay(250), fontSize: 'var(--t-lead)', lineHeight: 1.6, maxWidth: '46ch', color: '#e6dcff' }}>{project.description}</p>
         )}
+        <div className="in" style={{ ...delay(300), display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
+          {project.live_url && (
+            <Button href={project.live_url} variant="light" target="_blank" rel="noopener noreferrer">
+              Visit the site
+            </Button>
+          )}
+          <ShareMenu url={url} title={project.title} emailSubject={`${project.title}, a case study`} label="Share this case study" variant="dark" align={project.live_url ? 'start' : 'end'} />
+        </div>
         {meta.length > 0 && (
           <dl className="in cs-meta" style={{ ...delay(350), width: '100%', maxWidth: 900, marginTop: 24, textAlign: 'left' }}>
             {meta.map((m) => (
@@ -251,12 +260,12 @@ function Extras({ project }: { project: Project }) {
   )
 }
 
-export default function ProjectDetailsClient({ project, next }: { project: Project; next?: Project | null }) {
+export default function ProjectDetailsClient({ project, next, url }: { project: Project; next?: Project | null; url: string }) {
   const structured = normaliseCaseStudy(project.case_study) !== null
   const nextImage = next ? resolveMediaUrl(next.image) : ''
   return (
     <div className="cs">
-      <Hero project={project} />
+      <Hero project={project} url={url} />
       <div className="wrap cs-body" style={{ paddingTop: project.image ? 200 : 96, paddingBottom: 100 }}>
         {structured ? <StructuredBody project={project} /> : <LegacyBody project={project} />}
       </div>

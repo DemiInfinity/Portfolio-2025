@@ -58,4 +58,22 @@ describe('Analytics', () => {
     renderApp(<Analytics />, { route: '/analytics?q=blog' })
     expect(await screen.findByText('3 pages')).toBeInTheDocument()
   })
+
+  it('shows the H-23 counting note, the measured caption and the campaigns list', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { success: true, data: { ...SAMPLE, trackingVersionSince: '2026-10-31', measuredViews: 1040, campaigns: [{ source: 'linkedin', medium: 'social', campaign: 'launch', visits: 12 }] } } })
+    renderApp(<Analytics />)
+    expect(await screen.findByTestId('counting-note')).toHaveTextContent('Counting changed on 31 Oct 2026: earlier figures over-counted visits and under-counted time.')
+    expect(screen.getByText('Based on 1,040 views with a measured time')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Campaigns' })).toBeInTheDocument()
+    expect(screen.getByText('launch')).toBeInTheDocument()
+    expect(screen.getByText('linkedin · social')).toBeInTheDocument()
+  })
+
+  it('hides the note and the campaigns when the summary has neither', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { success: true, data: { ...SAMPLE, campaigns: [] } } })
+    renderApp(<Analytics />)
+    await screen.findByText('688')
+    expect(screen.queryByTestId('counting-note')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Campaigns' })).not.toBeInTheDocument()
+  })
 })

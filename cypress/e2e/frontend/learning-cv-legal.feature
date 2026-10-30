@@ -63,8 +63,9 @@ Feature: Learning, CV and legal pages (F-18, F-19, F-20, D-5, D-8)
     Then the meta "robots" contains "noindex"
     And the sitemap does not list "/cv"
 
-  Scenario: F-19 AC6 maintenance on: /cv still renders, and records no analytics
+  Scenario: F-19 AC6 maintenance on: /cv still renders, and records no analytics (even with consent)
     Given maintenance mode is on
+    And the visitor has already chosen analytics "on" and preferences "off"
     And the visitor watches analytics requests
     When the visitor opens "/cv"
     And the visitor waits 2000 ms
@@ -77,8 +78,9 @@ Feature: Learning, CV and legal pages (F-18, F-19, F-20, D-5, D-8)
     When the visitor opens "/projects"
     Then the visitor sees the maintenance page
 
-  Scenario: F-19 control: analytics fires on a normal page
-    Given the visitor watches analytics requests
+  Scenario: F-19 control: analytics fires on a normal page (after consent)
+    Given the visitor has already chosen analytics "on" and preferences "off"
+    And the visitor watches analytics requests
     When the visitor opens "/projects"
     And the visitor waits 2000 ms
     Then at least one analytics request was sent
@@ -117,11 +119,13 @@ Feature: Learning, CV and legal pages (F-18, F-19, F-20, D-5, D-8)
     When the visitor opens "/terms"
     Then the page heading is "Terms of Use"
 
-  Scenario: F-20 AC3 analytics opt-out
+  Scenario: F-20 AC3 (opt-in): /privacy turns analytics off through Cookie settings
+    Given the visitor has already chosen analytics "on" and preferences "off"
     When the visitor opens "/privacy"
-    And the visitor clicks "Turn site analytics off"
-    Then the "Turn site analytics on" button is visible
-    And localStorage "portfolio_analytics_opt_out" is "1"
+    And the visitor clicks "Cookie settings" in the "main" section
+    Then the dialog "Cookie settings" is open
+    When the visitor clicks "Reject all"
+    Then the stored consent has analytics "false" and preferences "false"
 
   Scenario: F-20 show_marbl gates Marbl on Privacy
     Given the site flag "show_marbl" is off

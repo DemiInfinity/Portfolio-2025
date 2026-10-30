@@ -33,12 +33,23 @@ describe('Contact API', () => {
   const send = (body: any, ip = '203.0.113.45') => request(app).post('/api/contact').set('X-Forwarded-For', ip).send(body)
   const insert = () => db.callsFor('contact_messages', 'insert')[0]?.payload
 
-  it('valid body → 201 with id and received_at; row stored with anonymised IP', async () => {
-    const res = await send(valid)
+  it('valid body → 201 with id and received_at; no IP address or user agent stored (D-10)', async () => {
+    const res = await send(valid).set('User-Agent', 'Mozilla/5.0 Test')
     expect(res.status).toBe(201)
     expect(typeof res.body.data.id).toBe('number')
     expect(new Date(res.body.data.received_at).toISOString()).toBe(res.body.data.received_at)
-    expect(insert()).toMatchObject({ kind: 'role', name: 'Ada Lovelace', email: 'ada@company.com', message: 'What are you building?', source_path: '/about', ip_address: '203.0.113.0' })
+    expect(insert()).toEqual({ kind: 'role', name: 'Ada Lovelace', email: 'ada@company.com', message: 'What are you building?', source_path: '/about', status: 'new' })
+    expect(insert()).not.toHaveProperty('ip_address')
+    expect(insert()).not.toHaveProperty('user_agent')
+  })
+
+  it('the notification email contains neither the IP address nor the user agent', async () => {
+    process.env.RESEND_API_KEY = 'k'; process.env.CONTACT_TO_EMAIL = 'owner@x.com'
+    await send(valid, '203.0.113.45').set('User-Agent', 'Mozilla/5.0 SecretAgent')
+    const raw = fetchMock.mock.calls[0][1].body as string
+    expect(raw).not.toMatch(/203\.0\.113/)
+    expect(raw).not.toContain('SecretAgent')
+    expect(Object.keys(JSON.parse(raw)).sort()).toEqual(['from', 'reply_to', 'subject', 'text', 'to'])
   })
 
   it.each([

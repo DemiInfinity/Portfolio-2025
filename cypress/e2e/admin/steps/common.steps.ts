@@ -19,6 +19,10 @@ import {
 // ---------- setup ----------
 Given('the admin API serves the content fixture', () => {
   state.token = false
+  state.console = []
+  state.clipboard = null
+  state.copied = []
+  state.opened = []
   cy.viewport(1440, 900)
   installMockApi()
 })

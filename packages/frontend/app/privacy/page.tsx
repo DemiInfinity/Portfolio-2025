@@ -70,72 +70,181 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
 
       <h2>This website</h2>
       <p>
-        This is a public portfolio. You can browse the pages, follow links, email
-        me, or download a CV if one is shown. There is no visitor account,
-        contact form, comments, newsletter, or payment on this site.
+        This is a public portfolio. You can browse the pages, follow links, send
+        me a message through the Hire me form, email me, or download my CV.
+        There is no visitor account, comments, newsletter, or payment on this site.
       </p>
 
       <h3>What we collect when you visit</h3>
       <p>
-        If you have not turned analytics off, the site sends a first-party
-        page-visit record to our own API. We store the page path, a session id
-        created in your browser for that visit, the referrer, how long you
-        stayed (if more than a few seconds), your browser user agent, and an
-        anonymized IP address. The browser may also send a page title; we do
-        not rely on that field as stored data.
+        Nothing, unless you allow analytics. The first time you visit, a banner
+        asks whether I may count your visit. Until you choose “Allow
+        analytics”, no page-visit record is sent and no visit ID is created.
+        If your browser sends Global Privacy Control or Do Not Track, analytics
+        stays off unless you turn it on yourself.
       </p>
+      <p>If you allow analytics, each page you view sends a record to my own API with:</p>
+      <ul>
+        <li>the page you viewed and its title</li>
+        <li>how long you stayed on it (when it is more than a few seconds)</li>
+        <li>the site you came from (the referrer), if your browser shares it</li>
+        <li>your browser type (the user agent)</li>
+        <li>a shortened IP address, cut down so it does not identify you</li>
+        <li>a random visit ID, kept in your browser and replaced after 30 minutes without a page view</li>
+      </ul>
       <p>
-        We use this only to understand which pages are visited and to keep the
-        site working. We do not use it to advertise or to profile you
-        {showMarbl ? ', or to track you across our apps' : ''}.
-      </p>
-      <p>
-        We do not set first-party cookies for analytics. The session id lives
-        in memory for that browser tab until you reload. Hosts that serve the
-        site (currently Vercel and Supabase for files) may keep standard
-        request logs.
+        I use this only to see which pages are useful, so I can improve the
+        site. I do not use it to advertise, to profile you
+        {showMarbl ? ', or to track you across our apps' : ''}, and I do not
+        sell or share it. No third-party analytics or tracking tools are used:
+        the records go to my own database and nowhere else.
       </p>
 
       <h3>Your choice</h3>
       <p>
-        You can object to site analytics here, free of charge. If you turn them
-        off, we store that choice on this device so we can honour it, and we
-        stop sending new page-visit records from this browser.
+        Analytics is opt-in, and you can change your mind at any time, free of
+        charge, from “Cookie settings” at the bottom of every page. Turning
+        analytics off stops new records straight away and deletes the visit ID
+        from your browser. Your choice itself is stored in your browser
+        (localStorage) so you are not asked again; it is never sent to me.
+      </p>
+      <p>
+        “Preferences” is a separate, optional choice. If you allow it, your
+        browser remembers small things such as the home page colour theme. If
+        you don’t, nothing is stored and those choices last only for your visit.
       </p>
       <WebsiteAnalyticsChoice />
+
+      <h3>Cookies and similar storage</h3>
       <p>
-        To ask us to delete visit records we already hold, email{' '}
+        This site sets no cookies. It uses your browser’s own storage
+        (localStorage, which lasts until it is cleared) for the items below,
+        and only these.
+      </p>
+      <div className="legal-table-wrap">
+        <table className="legal-table">
+          <caption>What this site stores in your browser</caption>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Category</th>
+              <th scope="col">Purpose</th>
+              <th scope="col">How long it lasts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><code>portfolio_consent</code> (localStorage)</th>
+              <td>Essential</td>
+              <td>Remembers your cookie settings choice so you are not asked again.</td>
+              <td>Until you change it or clear your browser.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>portfolio_visit_id</code> (localStorage)</th>
+              <td>Analytics</td>
+              <td>A random visit ID and the time of your last page view, so the pages you view in one visit are counted together. Only created if you allow analytics.</td>
+              <td>Replaced with a new ID after 30 minutes without a page view; deleted straight away if you turn analytics off.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>portfolio_exclude_me</code> (localStorage)</th>
+              <td>Essential</td>
+              <td>Set only if you open a link with <code>?exclude_me=1</code> (meant for me, the site owner): this browser is then never counted. <code>?exclude_me=0</code> removes it.</td>
+              <td>Until removed that way or you clear your browser.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>home_colourway</code> (localStorage)</th>
+              <td>Preferences</td>
+              <td>Remembers the colour theme you picked on the home page. Only stored if you allow preferences.</td>
+              <td>Until you change it, turn preferences off, or clear your browser.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>post_sparkle:</code> plus the post’s address (localStorage)</th>
+              <td>Preferences</td>
+              <td>Remembers that you sent a sparkle on a blog post. Only stored if you allow preferences.</td>
+              <td>Until you undo it, turn preferences off, or clear your browser.</td>
+            </tr>
+            <tr>
+              <th scope="row"><code>portfolio_analytics_opt_out</code> (localStorage)</th>
+              <td>Essential</td>
+              <td>An older setting from before this banner. If your browser still has it, it is read once to carry over an “analytics off” choice.</td>
+              <td>Deleted on your next visit.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        To ask me to delete visit records I already hold, email{' '}
         <LegalContactLink />.
       </p>
 
-      <h3>If you email us or download a CV</h3>
+      <h3>If you message me, email me or download my CV</h3>
       <p>
-        Email uses your own mail app and goes to <LegalContactLink />. We do
-        not run a contact form on this site. A CV download, if offered, is a
-        file from our storage; we do not ask you to register to get it.
+        If you send a message through the Hire me form, I store what you enter
+        (the reason, your name if you give it, your email address and your
+        message) and the page you sent it from, so I can reply. A copy is
+        emailed to me through Resend, an email delivery service that sends it
+        on my behalf. Email you send directly goes to <LegalContactLink /> from
+        your own mail app. The CV download is a file from my storage; you do
+        not need to register to get it.
       </p>
 
       <h3>Third parties on this site</h3>
       <p>
-        Pages may load fonts from Google Fonts. Google may see your IP address
-        and browser details when that happens. We do not use Google Analytics
-        or advertising SDKs on this site. Outbound links (for example GitHub or
+        Fonts are served from this site, not from Google. I do not use Google
+        Analytics, advertising SDKs or any other third-party trackers. Hosts
+        that serve the site and its files (currently Vercel and Supabase) may
+        keep standard request logs. Outbound links (for example GitHub or
         LinkedIn) are those services’ own pages.
       </p>
 
       <h3>How long we keep website data</h3>
       <p>
-        Page-visit records are kept so we can see use of the site over time,
-        then deleted when they are no longer needed for that purpose. Emails
-        you send us are kept only as long as needed to reply.
+        Page-visit records are kept for 12 months and then deleted. Messages
+        from the Hire me form and emails you send are kept only as long as
+        needed to reply and follow up.
+      </p>
+
+      <h3>Who processes data for me</h3>
+      <p>I use these services to run the site. Each one handles data only to provide its service to me:</p>
+      <ul>
+        <li>
+          <strong>Supabase</strong> (database and file storage): stores analytics
+          records if you allow them, Hire me messages, the site’s content, and
+          files such as images and the CV.
+        </li>
+        <li>
+          <strong>Vercel</strong> (hosting and serverless functions): serves the
+          website and runs the API that receives page-visit records and Hire me
+          messages. Like any host, it may keep standard request logs.
+        </li>
+        <li>
+          <strong>Resend</strong> (email delivery): sends me a copy of each Hire
+          me message by email, once that is switched on. It receives the
+          message and the details you entered in the form.
+        </li>
+      </ul>
+      <p>
+        These providers may process data outside the UK. Where they do, they
+        rely on the safeguards UK data protection law allows for international
+        transfers, as set out in their own terms.
       </p>
 
       <h3>Your rights and children</h3>
+      <p>If UK GDPR applies to data I hold about you, you have the right to:</p>
+      <ul>
+        <li>ask for a copy of it (access)</li>
+        <li>ask me to correct it (correction)</li>
+        <li>ask me to delete it (deletion)</li>
+        <li>object to how I use it, including analytics (objection)</li>
+        <li>
+          complain to the Information Commissioner’s Office at{' '}
+          <a href="https://ico.org.uk">ico.org.uk</a>
+        </li>
+      </ul>
       <p>
-        If UK GDPR applies to data we hold about you, you can ask for access,
-        correction, or deletion by emailing <LegalContactLink />. You can also
-        complain to the Information Commissioner’s Office at{' '}
-        <a href="https://ico.org.uk">ico.org.uk</a>.
+        To use any of these rights, or to ask a question about your data, email
+        me at <LegalContactLink />. You can turn analytics off yourself at any
+        time from “Cookie settings”.
       </p>
       <p>
         This website is not directed at children under 13.

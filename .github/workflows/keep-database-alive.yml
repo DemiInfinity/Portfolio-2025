@@ -1,41 +1,52 @@
 name: Keep Database Alive
 
+# The free Supabase database pauses after 7 days without activity. This pings
+# the API's keep-alive endpoint daily, which queries the database and also
+# purges analytics rows older than 12 months (the retention the cookie notice
+# promises). A daily Vercel Cron on the backend (packages/backend/vercel.json)
+# pings the same endpoint as a backup, so one failing source isn't fatal.
+
 on:
   schedule:
-    # Run every 3 days at 2 AM UTC
-    # This prevents the free Supabase database from going to sleep
-    - cron: '0 2 */3 * *'
-  workflow_dispatch: # Allow manual triggering from GitHub Actions UI
+    - cron: '17 2 * * *' # daily at 02:17 UTC (off the hour, when Actions is less busy)
+  workflow_dispatch: # run it by hand from the Actions tab
+
+permissions:
+  actions: write # lets the last step re-enable this workflow (see below)
+  contents: read
 
 jobs:
   ping-database:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    
+    timeout-minutes: 10
+
     steps:
-      - name: Ping Database Keep-Alive Endpoint
+      - name: Ping the keep-alive endpoint (with retries)
         env:
           API_URL: ${{ secrets.API_URL || 'https://api.demitaylornimmo.com' }}
         run: |
-          echo "🔄 Pinging database keep-alive endpoint..."
-          echo "📍 URL: $API_URL/api/keepalive"
-          echo "⏰ Time: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
-          
-          # Make the request with timeout
-          response=$(curl -s -w "\n%{http_code}" --max-time 30 "$API_URL/api/keepalive" || echo -e "\n000")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
-          
-          if [ "$http_code" = "200" ]; then
-            echo "✅ Database keep-alive successful!"
-            echo "📊 Response: $body"
-            exit 0
-          else
-            echo "❌ Database keep-alive failed!"
-            echo "📊 HTTP Code: $http_code"
-            echo "📊 Response: $body"
-            # Don't fail the workflow - just log the error
-            # This prevents notification spam if the API is temporarily down
-            exit 0
-          fi
+          url="$API_URL/api/keepalive"
+          echo "Pinging $url at $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          # A cold serverless start plus a waking database can be slow, so try
+          # up to 4 times with growing waits before calling it a failure.
+          for attempt in 1 2 3 4; do
+            response=$(curl -s -w '\n%{http_code}' --max-time 45 "$url" || printf '\n000')
+            code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$code" = "200" ] && echo "$body" | grep -q '"success":true'; then
+              echo "Keep-alive OK on attempt $attempt: $body"
+              exit 0
+            fi
+            echo "Attempt $attempt failed (HTTP $code): $body"
+            [ "$attempt" -lt 4 ] && sleep $((attempt * 20))
+          done
+          echo "::error title=Keep-alive failed::$url did not answer after 4 attempts. The database may pause if this keeps failing."
+          exit 1 # fail loudly: GitHub emails the repo owner about failed scheduled runs
 
+      - name: Keep this schedule from being auto-disabled
+        # GitHub turns off scheduled workflows after 60 days without repo
+        # activity. Re-enabling through the API resets that timer.
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-database-alive.yml/enable" || echo "Could not re-enable (non-fatal)"

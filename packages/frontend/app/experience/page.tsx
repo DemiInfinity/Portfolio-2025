@@ -24,3 +24,4 @@ export default async function Experience() {
   const [roles, education] = await Promise.all([fetchWorkHistory(), fetchEducation()])
   return <ExperienceClient roles={[...roles].sort(byNewest)} education={education} />
 }
+

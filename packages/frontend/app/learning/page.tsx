@@ -25,3 +25,4 @@ export default async function Learning() {
   }
   return <LearningClient learning={learning} skills={skills} />
 }
+

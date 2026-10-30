@@ -1,18 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
-import PageError from '@/components/PageError'
+import ErrorView from '@/components/ErrorView'
+import type { ErrorBoundaryProps } from '@/components/ErrorView'
 
-export default function Error({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
-  useEffect(() => {
-    console.error(error)
-  }, [error])
-
-  return <PageError reset={reset} />
+/** 500 inside the site chrome (Error.dc.html). Root-layout failures go to global-error.tsx. */
+export default function Error(props: ErrorBoundaryProps) {
+  return <ErrorView {...props} />
 }

@@ -39,7 +39,8 @@ describe('summariseAnalytics', () => {
     expect(s.generatedAt).toBe('2026-10-27T09:41:00.000Z')
     expect(s.visits).toBe(4)
     expect(s.pageViews).toBe(5)
-    expect(s.avgSecondsPerView).toBe(40) // 200 / 5
+    expect(s.measuredViews).toBe(4)
+    expect(s.avgSecondsPerView).toBe(50) // 200 / 4 measured views (H-23)
   })
 
   it('referrers per visit from the first row, ties by source', () => {
@@ -65,9 +66,9 @@ describe('summariseAnalytics', () => {
 
   it('pages: views desc, latest non-empty title, avg seconds', () => {
     expect(s.pages).toEqual([
-      { path: '/', title: 'Home v2', views: 3, avgSeconds: 40 },
-      { path: '/blog', title: null, views: 1, avgSeconds: 20 },
-      { path: '/projects', title: 'Projects', views: 1, avgSeconds: 60 }
+      { path: '/', title: 'Home v2', views: 3, measuredViews: 2, avgSeconds: 60 },
+      { path: '/blog', title: null, views: 1, measuredViews: 1, avgSeconds: 20 },
+      { path: '/projects', title: 'Projects', views: 1, measuredViews: 1, avgSeconds: 60 }
     ])
   })
 

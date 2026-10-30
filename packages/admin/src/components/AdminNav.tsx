@@ -4,18 +4,25 @@ import { useAuth } from '@/hooks/useAuth'
 import { NAV, navFor, type NavItem } from '@/lib/nav'
 import { SITE_URL } from '@/lib/config'
 import Icon from './ui/Icon'
+import { useUnreadCount } from '@/lib/messages'
 import { useModal } from './ui/useModal'
 
-function NavLinkItem({ item, current, size = 18, onClick }: { item: NavItem; current: boolean; size?: number; onClick?: () => void }) {
+function NavLinkItem({ item, current, size = 18, onClick, count = 0 }: { item: NavItem; current: boolean; size?: number; onClick?: () => void; count?: number }) {
   return (
     <Link className="ad-link" to={item.path} aria-current={current ? 'page' : undefined} onClick={onClick}>
       <Icon name={item.icon} size={size} />
       {item.label}
+      {count > 0 ? (
+        <span className="count num">
+          <span aria-hidden="true">{count}</span>
+          <span className="sr">{count} unread</span>
+        </span>
+      ) : null}
     </Link>
   )
 }
 
-function MenuSheet({ pathname, onClose, onSignOut }: { pathname: string; onClose: () => void; onSignOut: () => void }) {
+function MenuSheet({ pathname, onClose, onSignOut, unread }: { pathname: string; onClose: () => void; onSignOut: () => void; unread: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const closeBtn = useRef<HTMLButtonElement>(null)
   useModal(ref, { onClose, initial: closeBtn })
@@ -30,7 +37,7 @@ function MenuSheet({ pathname, onClose, onSignOut }: { pathname: string; onClose
       </div>
       <nav aria-label="Admin" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {NAV.map((n) => (
-          <NavLinkItem key={n.path} item={n} current={n.path === pathname} size={20} onClick={onClose} />
+          <NavLinkItem key={n.path} item={n} current={n.path === pathname} size={20} onClick={onClose} count={n.path === '/messages' ? unread : 0} />
         ))}
       </nav>
       <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
@@ -46,6 +53,8 @@ export default function AdminNav() {
   const { pathname } = useLocation()
   const [sheet, setSheet] = useState(false)
   const name = user?.name || user?.email || 'Admin'
+  const unread = useUnreadCount(!!user).data ?? 0
+  const top = NAV.filter((n) => n.group === 'top')
   const content = NAV.filter((n) => n.group === 'Content')
   const site = NAV.filter((n) => n.group === 'Site')
 
@@ -57,7 +66,7 @@ export default function AdminNav() {
           <span className="ad-word">Demi</span>
           <span className="mute" style={{ fontSize: 13, marginLeft: 2 }}>Admin</span>
         </Link>
-        <NavLinkItem item={NAV[0]} current={pathname === '/'} />
+        {top.map((n) => <NavLinkItem key={n.path} item={n} current={n.path === pathname} count={n.path === '/messages' ? unread : 0} />)}
         <p className="ad-group">Content</p>
         {content.map((n) => <NavLinkItem key={n.path} item={n} current={n.path === pathname} />)}
         <p className="ad-group">Site</p>
@@ -85,7 +94,7 @@ export default function AdminNav() {
         </button>
       </div>
 
-      {sheet ? <MenuSheet pathname={pathname} onClose={() => setSheet(false)} onSignOut={() => { setSheet(false); logout() }} /> : null}
+      {sheet ? <MenuSheet pathname={pathname} unread={unread} onClose={() => setSheet(false)} onSignOut={() => { setSheet(false); logout() }} /> : null}
     </>
   )
 }

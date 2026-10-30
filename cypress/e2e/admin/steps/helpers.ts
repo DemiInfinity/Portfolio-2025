@@ -6,7 +6,15 @@ export const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export const exact = (s: string) => new RegExp('^\\s*' + esc(s) + '\\s*$')
 export const norm = (s: string) => s.replace(/\s+/g, ' ').trim()
 
-export const state = { token: false }
+export const state = {
+  token: false,
+  /** Every console call the app made, serialised (for the no-leak check). */
+  console: [] as string[],
+  /** 'ok' | 'fail' | null: stub navigator.clipboard.writeText before load. */
+  clipboard: null as null | 'ok' | 'fail',
+  copied: [] as string[],
+  opened: [] as unknown[][],
+}
 
 export const visitAdmin = (path: string) => {
   cy.visit(ADMIN_URL + path, {
@@ -14,6 +22,29 @@ export const visitAdmin = (path: string) => {
       if (state.token) win.localStorage.setItem('auth_token', 'test-access-token-123')
       else win.localStorage.removeItem('auth_token')
       ;(win as any).__qaNoReload = true
+      ;(['log', 'info', 'warn', 'error', 'debug'] as const).forEach((k) => {
+        const orig = win.console[k].bind(win.console)
+        win.console[k] = (...args: unknown[]) => {
+          state.console.push(args.map((a) => { try { return typeof a === 'string' ? a : JSON.stringify(a) } catch { return String(a) } }).join(' '))
+          orig(...args)
+        }
+      })
+      win.open = ((...args: unknown[]) => {
+        state.opened.push(args)
+        return null
+      }) as typeof win.open
+      if (state.clipboard) {
+        const mode = state.clipboard
+        Object.defineProperty(win.navigator, 'clipboard', {
+          configurable: true,
+          value: {
+            writeText: (t: string) => {
+              state.copied.push(t)
+              return mode === 'ok' ? Promise.resolve() : Promise.reject(new Error('denied'))
+            },
+          },
+        })
+      }
     },
   })
 }

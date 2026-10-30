@@ -13,6 +13,7 @@ import { resolveMediaUrl } from '@/lib/mediaUrl'
 import { useFeatureFlag } from '@/lib/useFeatureFlag'
 import { useResumeAvailability } from '@/lib/useResumeAvailability'
 import { useLocalStorage } from '@/lib/useClientStore'
+import { useConsent } from '@/components/consent/useConsent'
 import { colourways, contact, homeContact, homeHero, homeTeaser, marquee, person } from '@/lib/content/site'
 import type { Colourway } from '@/lib/content/site'
 
@@ -32,8 +33,10 @@ export type HomeStats = {
  */
 function useColourway(enabled: boolean) {
   const [stored, setStored] = useLocalStorage(COLOURWAY_KEY)
+  // Preferences consent: without it the choice works for this visit but is never stored.
+  const prefsAllowed = useConsent()?.prefs === true
   const [picked, setPicked] = useState<number | null>(null)
-  const storedIndex = colourways.findIndex((c) => c.name === stored)
+  const storedIndex = prefsAllowed ? colourways.findIndex((c) => c.name === stored) : -1
   // Flag off: always Lilac, and any remembered choice is ignored.
   const index = enabled ? picked ?? (storedIndex >= 0 ? storedIndex : 0) : 0
 
@@ -53,7 +56,7 @@ function useColourway(enabled: boolean) {
 
   const pick = (next: number) => {
     setPicked(next)
-    setStored(next === 0 ? null : colourways[next].name)
+    if (prefsAllowed) setStored(next === 0 ? null : colourways[next].name)
   }
 
   return [index, pick] as const
@@ -87,6 +90,7 @@ function Stack() {
           <div className="mono" style={{ fontSize: 14, display: 'flex', gap: 10 }}><span style={{ background: '#1f9e6e', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>GET</span>/projects</div>
           <div className="mono" style={{ fontSize: 14, display: 'flex', gap: 10 }}><span style={{ background: 'var(--b1)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>POST</span>/lore</div>
           <div className="mono" style={{ fontSize: 14, display: 'flex', gap: 10 }}><span style={{ background: '#5b4bd6', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>PUT</span>/sprints/:id</div>
+          <div className="mono" style={{ fontSize: 14, display: 'flex', gap: 10 }}><span style={{ background: '#c2410c', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>QUERY</span>/search</div>
           <div className="mono" style={{ fontSize: 13, opacity: 0.65, marginTop: 'auto' }}>200 OK · 42ms</div>
         </div>
         <div className="hero-layer ui" style={{ background: '#ffffff', padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>

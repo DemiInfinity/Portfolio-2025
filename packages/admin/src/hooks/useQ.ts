@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 
 /*
  * One `?q=` drives both the top-bar search and the page toolbar search (QA NB-1).
@@ -17,19 +17,36 @@ const subscribe = (f: () => void) => {
 }
 const snapshot = () => current
 
+let lastPath: string | null = null
+
 export const Q_SYNC_MS = 150
+
+/** Clear the shared search text (route change, tests). */
+export function resetQ(to = '') {
+  if (pending) clearTimeout(pending)
+  pending = null
+  current = to
+  emit()
+}
 
 export function useQ(): [string, (v: string) => void] {
   const [params, setParams] = useSearchParams()
   const urlQ = params.get('q') || ''
   const q = useSyncExternalStore(subscribe, snapshot, snapshot)
 
+  const { pathname } = useLocation()
   useEffect(() => {
+    // A new page starts from its own URL; a write still pending for the old page is dropped.
+    if (lastPath !== pathname) {
+      lastPath = pathname
+      if (pending || urlQ !== current) resetQ(urlQ)
+      return
+    }
     if (pending === null && urlQ !== current) {
       current = urlQ
       emit()
     }
-  }, [urlQ])
+  }, [urlQ, pathname])
 
   const setQ = useCallback(
     (v: string) => {

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import BlogClient from '../blog/(list)/blog-client'
 import BlogPostClient, { sparkleKey } from '../blog/[slug]/BlogPostClient'
 import { ToastProvider } from '@/components/ui/Toast'
+import { saveConsent, resetConsentMemory } from '@/lib/consent'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/blog' }))
 
@@ -93,7 +94,8 @@ describe('Blog post', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Link copied to your clipboard'))
   })
 
-  it('remembers the sparkle per slug', async () => {
+  it('remembers the sparkle per slug (with preference consent)', async () => {
+    saveConsent({ analytics: false, prefs: true })
     const { unmount } = renderPost()
     await userEvent.click(screen.getByRole('button', { name: 'Send a sparkle' }))
     expect(screen.getByRole('button', { name: 'Sparkle sent' })).toHaveAttribute('aria-pressed', 'true')
@@ -101,5 +103,14 @@ describe('Blog post', () => {
     unmount()
     renderPost()
     expect(await screen.findByRole('button', { name: 'Sparkle sent' })).toHaveAttribute('aria-pressed', 'true')
+    resetConsentMemory()
+  })
+
+  it('without preference consent the sparkle works for the visit but is not stored', async () => {
+    resetConsentMemory()
+    renderPost()
+    await userEvent.click(screen.getByRole('button', { name: 'Send a sparkle' }))
+    expect(screen.getByRole('button', { name: 'Sparkle sent' })).toHaveAttribute('aria-pressed', 'true')
+    expect(window.localStorage.getItem(sparkleKey('stop-thinking'))).toBeNull()
   })
 })

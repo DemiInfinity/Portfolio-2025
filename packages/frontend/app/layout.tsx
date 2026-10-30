@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
+import { OriginalPathProvider } from '@/components/SitePathname'
+import { ORIGINAL_PATH_HEADER } from '@/lib/originalPath'
 import { Dancing_Script, JetBrains_Mono, Playfair_Display, Poppins, Source_Serif_4 } from 'next/font/google'
 import './globals.css'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
@@ -36,16 +39,26 @@ export const metadata: Metadata = {
     title: 'Home | Demi Taylor Nimmo',
     description: 'Projects, writing and professional experience from full-stack software engineer Demi Taylor Nimmo.',
     type: 'website',
+    siteName: 'Demi Taylor Nimmo',
+    images: [{ url: '/og-default.png', width: 1200, height: 630, alt: 'Demi Taylor Nimmo, full-stack software engineer' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/og-default.png'],
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Set by proxy.ts only when it rewrites a missing detail page to the 404.
+  const originalPath = (await headers()).get(ORIGINAL_PATH_HEADER)
   return (
     <html lang="en" className={`${poppins.variable} ${playfair.variable} ${dancing.variable} ${jetbrains.variable} ${sourceSerif.variable}`}>
       <body>
         <MaintenanceWrapper>
           <AnalyticsProvider>
-            <SiteChrome>{children}</SiteChrome>
+            <OriginalPathProvider value={originalPath}>
+              <SiteChrome>{children}</SiteChrome>
+            </OriginalPathProvider>
           </AnalyticsProvider>
         </MaintenanceWrapper>
       </body>

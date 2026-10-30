@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { useSitePathname } from '../SitePathname'
 import IconButton, { CloseIcon } from '@/components/ui/IconButton'
 import Button from '@/components/ui/Button'
 import { useOverlayBehaviour } from './useOverlayBehaviour'
@@ -11,7 +11,7 @@ import { contact } from '@/lib/content/site'
 
 /** Drawer from the right (Overlays, menu branch). */
 export default function MobileMenu({ onClose, onContact }: { onClose: () => void; onContact: () => void }) {
-  const pathname = usePathname()
+  const pathname = useSitePathname()
   const navRef = useRef<HTMLElement>(null)
   useOverlayBehaviour(navRef, onClose)
 

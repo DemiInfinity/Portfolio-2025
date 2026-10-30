@@ -80,6 +80,27 @@ function defaultRoute(req: Logged, db: any): Reply {
   if (path === '/auth/change-password' && method === 'PUT') {
     return { statusCode: 200, body: { success: true, message: 'Password changed' } }
   }
+  // Messages inbox (H-24)
+  if (path === '/contact/unread-count' && method === 'GET') {
+    return { statusCode: 200, body: { success: true, unread: db.messages.filter((m: any) => !m.read).length } }
+  }
+  if (path === '/contact' && method === 'GET') {
+    const rows = [...db.messages].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
+    return { statusCode: 200, body: { success: true, data: rows, unread: rows.filter((m: any) => !m.read).length } }
+  }
+  if (seg[0] === 'contact' && seg[1]) {
+    const m = db.messages.find((x: any) => String(x.id) === seg[1])
+    if (!m) return { statusCode: 404, body: { success: false, error: 'Not found' } }
+    if (method === 'PATCH') {
+      if (typeof body?.read !== 'boolean') return invalid([{ path: 'read', msg: 'read is true or false' }])
+      m.read = body.read
+      return ok(m)
+    }
+    if (method === 'DELETE') {
+      db.messages.splice(db.messages.indexOf(m), 1)
+      return { statusCode: 204, body: '' }
+    }
+  }
   // projects (H-19 admin reads)
   if (path === '/projects/admin/all' && method === 'GET') return ok(db.projects.map(projectListRow))
   if (seg[0] === 'projects' && seg[1] === 'admin' && seg[2] && method === 'GET') {

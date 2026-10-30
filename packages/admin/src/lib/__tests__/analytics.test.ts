@@ -43,4 +43,24 @@ describe('analytics', () => {
     expect(stamp('2026-10-27T09:41:00', new Date(2026, 9, 27, 10))).toBe('Updated today, 09:41')
     expect(stamp('2026-10-20T09:41:00', new Date(2026, 9, 27, 10))).toBe('Updated 20 Oct 2026, 09:41')
   })
+
+  it('H-23: counting note when the range starts before v2, and the measured-views caption', () => {
+    const vm = buildAnalytics({ ...SAMPLE, trackingVersionSince: '2026-10-31', measuredViews: 1040 })
+    expect(vm.countingNote).toBe('Counting changed on 31 Oct 2026: earlier figures over-counted visits and under-counted time.')
+    expect(vm.kpis[2].caption).toBe('Based on 1,040 views with a measured time')
+    expect(buildAnalytics({ ...SAMPLE, trackingVersionSince: '2026-09-01' }).countingNote).toBeNull()
+    expect(buildAnalytics(SAMPLE).countingNote).toBeNull()
+    expect(buildAnalytics(SAMPLE).kpis[2].caption).toBe('Weighted by views')
+  })
+
+  it('H-23: campaigns sorted by visits, empty when absent', () => {
+    const vm = buildAnalytics({ ...SAMPLE, campaigns: [
+      { source: 'newsletter', medium: 'email', campaign: null, visits: 4 },
+      { source: 'linkedin', medium: 'social', campaign: 'launch', visits: 12 },
+    ] })
+    expect(vm.campaigns.map((c) => [c.name, c.detail, c.visits])).toEqual([['launch', 'linkedin · social', '12'], ['No campaign name', 'newsletter · email', '4']])
+    expect(vm.campaigns[0].top).toBe(true)
+    expect(buildAnalytics(SAMPLE).campaigns).toEqual([])
+    expect(buildAnalytics({ ...SAMPLE, campaigns: [] }).campaigns).toEqual([])
+  })
 })

@@ -13,6 +13,9 @@ const MIN = 6
 
 export const RESUME_KEY = ['resume'] as const
 
+/** The site honours `?exclude_me=1` by storing a flag and never tracking that browser (H-23 / analytics audit). */
+export const EXCLUDE_ME_URL = `${SITE_URL}/?exclude_me=1`
+
 export default function Settings() {
   const { user, refreshUser } = useAuth()
   const { say } = useToast()
@@ -223,6 +226,18 @@ export default function Settings() {
               <button type="submit" className="btn btn-line" disabled={password.isPending}>{password.isPending ? 'Saving' : 'Change password'}</button>
             </div>
           </form>
+        </section>
+
+        <section className="set" aria-labelledby="st-me-t">
+          <div>
+            <h2 id="st-me-t" className="set-t">Don't count my own visits</h2>
+            <p className="set-d">The site can't see this admin, so it counts your visits like anyone else's. Open the site once with this link in each browser you use, and that browser is never counted.</p>
+          </div>
+          <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+            <a className="btn btn-line" href={EXCLUDE_ME_URL} target="_blank" rel="noopener noreferrer">Open the site and stop counting this browser</a>
+            <p className="mute" style={{ fontSize: 13 }}>Do it again after clearing this browser's data or using a new one. Private windows aren't remembered.</p>
+            <p className="mono mute" style={{ fontSize: 12, wordBreak: 'break-all' }}>{EXCLUDE_ME_URL}</p>
+          </div>
         </section>
 
         <section className="set" aria-labelledby="st-sys-t">

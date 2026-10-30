@@ -22,12 +22,7 @@ const MaintenanceWrapper: React.FC<MaintenanceWrapperProps> = ({ children }) => 
 
   // Show maintenance page only if maintenance mode is confirmed enabled
   if (showMaintenance && !isExempt) {
-    return (
-      <MaintenancePage 
-        estimatedTime="a few hours"
-        message="We're currently performing scheduled maintenance to improve your experience. We'll be back soon!"
-      />
-    )
+    return <MaintenancePage />
   }
 
   // Always show normal site during loading or on error (fail-safe)

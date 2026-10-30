@@ -21,6 +21,7 @@ import { errorHandler } from './middleware/errorHandler'
 import { notFound } from './middleware/notFound'
 
 import { mountApiRoutes } from './routes/mount'
+import { applyCrawlerPolicy } from './middleware/crawlerPolicy'
 
 // Load environment variables
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development'
@@ -33,6 +34,10 @@ const PORT = process.env.PORT || 3001
 
 // Trust proxy for Vercel deployment
 app.set('trust proxy', 1)
+
+// Not indexable: X-Robots-Tag on every response and robots.txt, before
+// everything else (no rate limit, no Supabase init).
+applyCrawlerPolicy(app)
 
 // Rate limiting
 const limiter = rateLimit({
@@ -60,7 +65,7 @@ app.use(cors({
     /^https:\/\/.*\.vercel\.app$/
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   optionsSuccessStatus: 200
 }))

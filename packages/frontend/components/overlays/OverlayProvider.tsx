@@ -42,3 +42,8 @@ export function useOverlay(): OverlayApi {
   if (!ctx) throw new Error('useOverlay must be used inside <OverlayProvider>')
   return ctx
 }
+
+/** Same as useOverlay, but null outside the provider (bare routes such as /cv). */
+export function useOptionalOverlay(): OverlayApi | null {
+  return useContext(OverlayContext)
+}

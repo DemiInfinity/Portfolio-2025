@@ -1,3 +1,12 @@
+# 2026-10-30: the admin must never appear in search results or AI tools.
+# Googlebot and Bingbot may fetch pages only so they can see the noindex
+# (meta robots + X-Robots-Tag header) and drop any URL they already know.
+# Everyone else, every AI crawler included, is disallowed.
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
 User-agent: *
 Disallow: /
-

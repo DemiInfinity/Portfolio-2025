@@ -49,10 +49,12 @@ Feature: Design details from the plan's Work notes (F-3 to F-19)
     When the visitor opens "/blog/shipping-a-desktop-app"
     Then the reading progress bar is not shown
 
+  @loader
   Scenario: F-9 slow API shows the loader during navigation
     Given the visitor uses a desktop screen
     And the site mock answers "GET /api/learning" slowly after 4000 ms
     When the visitor opens "/"
+    And the visitor waits until the route "/learning" has been prefetched
     And the visitor clicks "Learning" in the "Footer" nav
     Then a status region says "Waking the server…"
     And the visitor sees "It naps when nobody’s around. Give it a few seconds."

@@ -201,8 +201,10 @@ class FakeQuery implements PromiseLike<any> {
     this.call.payload = clone(payload)
     return this
   }
-  delete() {
+  delete(options?: any) {
     this.call.op = 'delete'
+    this.call.options = options
+    if (options?.count) this.selectOptions = { count: options.count }
     return this
   }
   eq(column: string, value: any) { this.call.filters.push({ type: 'eq', column, value }); return this }
@@ -246,9 +248,12 @@ class FakeQuery implements PromiseLike<any> {
     const err = typeof injected === 'function' ? injected(call) : injected
     if (err) return { data: null, error: err, count: null }
 
-    if (call.columns) {
+    if (call.columns || call.filters.length) {
       const missing = state.missingColumns[call.table] || []
-      const wanted = call.columns.split(',').map((c) => c.trim())
+      const wanted = (call.columns || '').split(',').map((c) => c.trim())
+      // PostgREST also rejects filters and ordering on a column that doesn't exist.
+      for (const f of call.filters) if ('column' in f) wanted.push(f.column)
+      for (const o of call.orders) wanted.push(o.column)
       const hit = wanted.find((c) => missing.includes(c))
       if (hit) {
         return {

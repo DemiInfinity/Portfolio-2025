@@ -42,6 +42,24 @@ describe('Layout', () => {
     vi.mocked(api.get).mockResolvedValue(flags(false))
   })
 
+  it('shows the unread badge on Messages (sidebar and sheet), hidden at 0', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.get).mockImplementation(async (url: string) => (url === '/contact/unread-count' ? { data: { success: true, unread: 3 } } : flags(false)) as never)
+    const { container } = renderApp(ui)
+    const side = container.querySelector('nav.ad-side') as HTMLElement
+    expect(await within(side).findByRole('link', { name: 'Messages 3 unread' })).toHaveAttribute('href', '/messages')
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    expect(within(screen.getByRole('dialog', { name: 'Admin menu' })).getByRole('link', { name: 'Messages 3 unread' })).toBeInTheDocument()
+  })
+
+  it('hides the badge when there are no unread messages', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => (url === '/contact/unread-count' ? { data: { success: true, unread: 0 } } : flags(false)) as never)
+    const { container } = renderApp(ui)
+    await screen.findByText('Live')
+    expect(within(container.querySelector('nav.ad-side') as HTMLElement).getByRole('link', { name: 'Messages' })).toBeInTheDocument()
+    expect(container.querySelector('.ad-link .count')).toBeNull()
+  })
+
   it('renders the brand, the user and the sign out button', () => {
     const { container } = renderApp(ui)
     expect(container.textContent).toContain('Demi')
@@ -50,11 +68,11 @@ describe('Layout', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('renders the 11 links in order under Content and Site, with the design labels', () => {
+  it('renders the 12 links in order under Content and Site, with the design labels', () => {
     const { container } = renderApp(ui, { route: '/blog' })
     const side = container.querySelector('nav.ad-side') as HTMLElement
     const labels = within(side).getAllByRole('link').slice(1).map((a) => a.textContent)
-    expect(labels).toEqual(['Dashboard', 'About', 'Projects', 'Blog', 'Work history', 'Education', 'Certifications', 'Learning', 'Analytics', 'Feature flags', 'Settings'])
+    expect(labels).toEqual(['Dashboard', 'Messages', 'About', 'Projects', 'Blog', 'Work history', 'Education', 'Certifications', 'Learning', 'Analytics', 'Feature flags', 'Settings'])
     expect(side.textContent).toContain('Content')
     expect(side.textContent).toContain('Site')
     expect(container.querySelector('a[href="/"]')).toBeTruthy()
@@ -109,7 +127,7 @@ describe('Layout', () => {
     expect(open).toHaveAttribute('aria-expanded', 'false')
     await user.click(open)
     const sheet = screen.getByRole('dialog', { name: 'Admin menu' })
-    expect(within(sheet).getAllByRole('link')).toHaveLength(12) // 11 nav + View site
+    expect(within(sheet).getAllByRole('link')).toHaveLength(13) // 12 nav + View site
     expect(within(sheet).getByRole('button', { name: 'Close menu' })).toHaveFocus()
     await user.click(within(sheet).getByRole('link', { name: 'Education' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

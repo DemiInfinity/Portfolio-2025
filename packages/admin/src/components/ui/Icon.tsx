@@ -17,10 +17,20 @@ const PATHS = {
   external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
   refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6',
   file: 'M7 3h7l4 4v14H7zM14 3v4h4',
+  mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   about: 'M12 4a4 4 0 1 0 0 8 4 4 0 1 0 0-8zM4 20c0-3.3 3.6-6 8-6s8 2.7 8 6',
   up: 'M6 15l6-6 6 6',
   down: 'M6 9l6 6 6-6',
 } as const
+
+/** The LinkedIn mark (filled, brand blue) from AdminShare. */
+export function LinkedInMark({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#0a66c2" d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05C20.6 8.65 21 11.3 21 14.7V21h-4v-5.6c0-1.34-.02-3.06-1.86-3.06-1.87 0-2.15 1.46-2.15 2.96V21H9z" />
+    </svg>
+  )
+}
 
 export type IconName = keyof typeof PATHS
 

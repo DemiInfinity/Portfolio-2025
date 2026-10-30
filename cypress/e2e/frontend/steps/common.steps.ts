@@ -30,6 +30,14 @@ Before({ tags: '@site' }, () => {
   })
   setReducedMotion(false)
   setPrintMedia(false)
+  // Optional CI-like slowdown: --env CPU_THROTTLE=6
+  cy.wrap(
+    Cypress.automation('remote:debugger:protocol', {
+      command: 'Emulation.setCPUThrottlingRate',
+      params: { rate: Number(Cypress.env('CPU_THROTTLE') || 1) },
+    }),
+    { log: false }
+  )
   cy.viewport(...VIEWPORTS.desktop)
   // Pass-through spies for the client-side checks (the mock answers them).
   cy.intercept('GET', '**/api/feature-flags/public/*').as('flagCheck')
@@ -73,7 +81,11 @@ Given('the site flag {string} is {word}', (name: string, state: string) => {
 
 Given('the visitor has {string} set to {string} in localStorage', (key: string, value: string) => {
   // Seeded on the app origin before the page script runs.
+  // Only before the first page load of the scenario: a returning visitor's existing storage.
+  let done = false
   cy.on('window:before:load', (win) => {
+    if (done) return
+    done = true
     try {
       win.localStorage.setItem(key, value)
     } catch {
@@ -291,7 +303,7 @@ Then('the meta {string} is {string}', (name: string, value: string) => {
 Then('the visitor sees the not-found page with a link home', () => {
   cy.get('h1').should('have.length', 1)
   cy.get('a[href="/"]').filter(':visible').filter((_, el) => /home/i.test(accName(el))).should('have.length.gte', 1)
-  bodyText().should('match', /(doesn.t exist|not found|can.t find|couldn.t find)/i)
+  bodyText().should('match', /(wrong turn|doesn.t exist|not found|can.t find|couldn.t find)/i)
 })
 
 Then('there is a section with id {string}', (id: string) => {
@@ -519,7 +531,7 @@ Then('at least one analytics request was sent', () => {
 })
 
 Then('the visitor sees the maintenance page', () => {
-  cy.contains('h1', 'Under Maintenance').should('be.visible')
+  cy.get('h1').should(($h) => expect(norm($h[0].innerText)).to.eq('Back soon'))
 })
 
 Then('the mock API saw {string} with {string}', (route: string, search: string) => {

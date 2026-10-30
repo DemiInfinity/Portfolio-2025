@@ -1,9 +1,11 @@
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
+import { resetQ } from '@/hooks/useQ'
 
 afterEach(() => {
   cleanup()
+  resetQ()
 })
 
 // jsdom has no matchMedia
