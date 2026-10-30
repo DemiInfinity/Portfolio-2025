@@ -568,3 +568,11 @@ main { position: relative; }
 .nav-pending { position: absolute; inset: 0; z-index: 15; min-height: 70vh; animation: nav-pending-in 200ms ease 120ms both; }
 .nav-pending .state-frame { min-height: 100%; height: 100%; animation: none; }
 @keyframes nav-pending-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* D-13: the accept and reject choices share one style (same size, weight, colour and contrast). */
+.consent-choice { background: #fff; border-color: #5b21b6; color: #4c1d95; }
+.consent-choice:hover { background: #f5efff; }
+
+/* QA B-4: the share menu is portalled to <body>; fixed against its trigger, above page content. */
+.share-menu-portal { position: fixed; top: 0; left: 0; right: auto; bottom: auto; z-index: 58; transform-origin: top left; }
+.share-menu-portal.up { transform-origin: bottom left; bottom: auto; }

@@ -11,6 +11,8 @@ import {
   hasAnalyticsConsent,
   resetConsentMemory,
   openCookieSettings,
+  isCurrentConsent,
+  CONSENT_MAX_AGE_MS,
 } from '../consent'
 import ConsentManager, { CONSENT_COPY } from '@/components/consent/ConsentManager'
 import { ToastProvider } from '@/components/ui/Toast'
@@ -123,15 +125,14 @@ describe('banner and settings', () => {
     const banner = screen.getByRole('region', { name: CONSENT_COPY.bannerTitle })
     const no = within(banner).getByRole('button', { name: 'No thanks' })
     const yes = within(banner).getByRole('button', { name: 'Allow analytics' })
-    expect(no.className.split(' ')).toContain('consent-btn')
-    expect(yes.className.split(' ')).toContain('consent-btn')
+    expect(no.className).toBe(yes.className)
     expect(screen.queryByText(CONSENT_COPY.gpcNote)).not.toBeInTheDocument()
   })
 
   it('Allow analytics saves consent, hides the banner and confirms', async () => {
     renderManager()
     await userEvent.click(screen.getByRole('button', { name: 'Allow analytics' }))
-    expect(readConsent()).toMatchObject({ analytics: true, prefs: true })
+    expect(readConsent()).toMatchObject({ analytics: true, prefs: false })
     expect(screen.queryByRole('region', { name: CONSENT_COPY.bannerTitle })).not.toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent(CONSENT_COPY.accepted)
   })
@@ -185,5 +186,45 @@ describe('banner and settings', () => {
     renderManager()
     act(() => openCookieSettings())
     expect(screen.getByRole('dialog', { name: 'Cookie settings' })).toBeInTheDocument()
+  })
+})
+
+describe('consent v2 (compliance MUST-2, D-12)', () => {
+  it('the banner’s "Allow analytics" grants analytics only', async () => {
+    renderManager()
+    await userEvent.click(screen.getByRole('button', { name: 'Allow analytics' }))
+    expect(readConsent()).toMatchObject({ v: 2, analytics: true, prefs: false })
+  })
+
+  it('Accept and Reject in the banner share one style (D-13)', () => {
+    renderManager()
+    const no = screen.getByRole('button', { name: 'No thanks' })
+    const yes = screen.getByRole('button', { name: 'Allow analytics' })
+    expect(no.className).toBe(yes.className)
+    expect(screen.getByRole('link', { name: 'How I use it' })).toHaveAttribute('href', '/privacy')
+  })
+
+  it('a v1 choice (which could have granted Preferences silently) is asked again', () => {
+    window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ v: 1, analytics: true, prefs: true, at: new Date().toISOString() }))
+    expect(readConsent()).toBeNull()
+    renderManager()
+    expect(screen.getByRole('region', { name: CONSENT_COPY.bannerTitle })).toBeInTheDocument()
+  })
+
+  it('a choice expires after six months', () => {
+    const loadedAt = Date.parse('2026-10-30T12:00:00Z')
+    const choice = (at: string) => ({ v: CONSENT_VERSION, analytics: true, prefs: false, at })
+    expect(isCurrentConsent(choice('2026-06-01T12:00:00Z'), loadedAt)).toBe(true)
+    expect(isCurrentConsent(choice('2026-04-30T11:59:00Z'), loadedAt)).toBe(false)
+    expect(isCurrentConsent(choice('not a date'), loadedAt)).toBe(false)
+    expect(CONSENT_MAX_AGE_MS).toBe(182 * 24 * 60 * 60 * 1000)
+  })
+
+  it('an expired stored choice brings the banner back', () => {
+    const old = new Date(Date.now() - CONSENT_MAX_AGE_MS - 60_000).toISOString()
+    window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ v: CONSENT_VERSION, analytics: true, prefs: true, at: old }))
+    expect(hasAnalyticsConsent()).toBe(false)
+    renderManager()
+    expect(screen.getByRole('region', { name: CONSENT_COPY.bannerTitle })).toBeInTheDocument()
   })
 })

@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { notFound, redirect } from 'next/navigation'
 import ProjectDetailsClient from '../project-details-client'
 import { fetchProjectById, fetchProjectBySlug, fetchProjects } from '@/lib/api'
@@ -19,7 +22,9 @@ export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const project = /^\d+$/.test(slug) ? await fetchProjectById(slug) : await fetchProjectBySlug(slug)
+  const loaded = await loadOrUnavailable(() => (/^\d+$/.test(slug) ? fetchProjectById(slug) : fetchProjectBySlug(slug)))
+  if (!loaded.ok) return { title: 'Projects' }
+  const project = loaded.data
   if (!project) return { title: 'Project Not Found | Projects' }
 
   const title = `${project.title} | Projects`
@@ -71,13 +76,17 @@ export default async function ProjectPage({ params }: PageProps) {
 
   // Backwards compatibility: allow /projects/:id and redirect to /projects/:slug
   if (/^\d+$/.test(slug)) {
-    const byId = await fetchProjectById(slug)
+    const loadedById = await loadOrUnavailable(() => fetchProjectById(slug))
+    if (!loadedById.ok) return <RouteError {...ROUTE_ERRORS.projects} reference={loadedById.reference} />
+    const byId = loadedById.data
     if (!byId) notFound()
     if (byId.slug) redirect(`/projects/${byId.slug}`)
     return <ProjectDetailsClient project={byId} next={await loadNext(byId.slug)} url={siteUrl(`/projects/${slug}`)} />
   }
 
-  const project = await fetchProjectBySlug(slug)
+  const loaded = await loadOrUnavailable(() => fetchProjectBySlug(slug))
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.projects} reference={loaded.reference} />
+  const project = loaded.data
   if (!project) notFound()
 
   const canonical = siteUrl(`/projects/${project.slug || slug}`)

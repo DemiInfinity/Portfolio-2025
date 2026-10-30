@@ -2,7 +2,26 @@
 import { Then, When } from '@badeball/cypress-cucumber-preprocessor'
 import { exact, norm, visitAdmin } from './helpers'
 
-const PAGES = ['/', '/about', '/projects', '/blog', '/work-history', '/education', '/certifications', '/learning', '/analytics', '/feature-flags', '/settings']
+/** Name as assistive tech builds it: text with aria-hidden parts left out, inline pieces joined as they are. */
+export const accName = (el: Element): string => {
+  if (el.getAttribute('aria-label')) return norm(el.getAttribute('aria-label')!)
+  // Text with aria-hidden parts left out; like browsers, a non-inline box (block, flex item, inline-block) is spaced from its neighbours.
+  const walk = (n: Node): string => {
+    if (n.nodeType === 3) return n.textContent || ''
+    if (n.nodeType !== 1) return ''
+    const e = n as Element
+    if (e.getAttribute('aria-hidden') === 'true') return ''
+    const inner = Array.from(e.childNodes).map(walk).join('')
+    const view = e.ownerDocument.defaultView!
+    const display = view.getComputedStyle(e).display
+    const parentDisplay = e.parentElement ? view.getComputedStyle(e.parentElement).display : ''
+    const block = display !== 'inline' || /flex|grid/.test(parentDisplay)
+    return e === el ? inner : block ? ` ${inner} ` : inner
+  }
+  return norm(walk(el))
+}
+
+const PAGES = ['/messages', '/', '/about', '/projects', '/blog', '/work-history', '/education', '/certifications', '/learning', '/analytics', '/feature-flags', '/settings']
 
 Then('the admin sees that the app root has the class {string}', (cls: string) => {
   cy.get('#root > *').first().should('have.class', cls)
@@ -31,7 +50,7 @@ Then('no page in the admin shows an emoji', () => {
 
 Then('the admin sees that the sidebar links read {string}', (list: string) => {
   cy.get('nav.ad-side').should('be.visible').find('a.ad-link').should(($a) => {
-    expect($a.toArray().map((a) => norm(a.textContent || ''))).to.deep.eq(list.split(', '))
+    expect($a.toArray().map((a) => accName(a))).to.deep.eq(list.split(', '))
   })
 })
 

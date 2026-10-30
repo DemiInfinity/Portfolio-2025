@@ -63,9 +63,8 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
         This website is <a href={LEGAL_SITE_URL}>{LEGAL_SITE_URL.replace('https://', '')}</a>.
       </p>
       <p>
-        We may update these documents when we operate under a different brand or
-        legal entity. Continued use after we give notice of a change means you
-        accept the updated policy.
+        If I change this policy, I’ll update the effective date above, and for
+        significant changes I’ll say so on the site.
       </p>
 
       <h2>This website</h2>
@@ -89,7 +88,7 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
         <li>how long you stayed on it (when it is more than a few seconds)</li>
         <li>the site you came from (the referrer), if your browser shares it</li>
         <li>your browser type (the user agent)</li>
-        <li>a shortened IP address, cut down so it does not identify you</li>
+        <li>a shortened IP address (the last part removed), which on its own can’t pinpoint your connection</li>
         <li>a random visit ID, kept in your browser and replaced after 30 minutes without a page view</li>
       </ul>
       <p>
@@ -106,7 +105,8 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
         charge, from “Cookie settings” at the bottom of every page. Turning
         analytics off stops new records straight away and deletes the visit ID
         from your browser. Your choice itself is stored in your browser
-        (localStorage) so you are not asked again; it is never sent to me.
+        (localStorage) so you are not asked again; it is never sent to me. I ask
+        again after six months, and whenever I change what the banner asks for.
       </p>
       <p>
         “Preferences” is a separate, optional choice. If you allow it, your
@@ -117,9 +117,11 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
 
       <h3>Cookies and similar storage</h3>
       <p>
-        This site sets no cookies. It uses your browser’s own storage
-        (localStorage, which lasts until it is cleared) for the items below,
-        and only these.
+        This site sets no cookies, and no other site sets any through it:
+        images, files and the CV are served from this site’s own address, so
+        your browser never contacts my file host. It uses your browser’s own
+        storage (localStorage, which lasts until it is cleared) for the items
+        below, and only these.
       </p>
       <div className="legal-table-wrap">
         <table className="legal-table">
@@ -177,31 +179,49 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
         <LegalContactLink />.
       </p>
 
-      <h3>If you message me, email me or download my CV</h3>
+      <h3>If you message me through Hire me</h3>
+      <p>When you send a message through the Hire me form, I store:</p>
+      <ul>
+        <li>what you’re getting in touch about (the option you chose)</li>
+        <li>your name, if you give it</li>
+        <li>your email address</li>
+        <li>your message</li>
+        <li>the page you sent it from</li>
+      </ul>
       <p>
-        If you send a message through the Hire me form, I store what you enter
-        (the reason, your name if you give it, your email address and your
-        message) and the page you sent it from, so I can reply. A copy is
-        emailed to me through Resend, an email delivery service that sends it
-        on my behalf. Email you send directly goes to <LegalContactLink /> from
-        your own mail app. The CV download is a file from my storage; you do
-        not need to register to get it.
+        I don’t store your IP address or any details of your browser or device
+        with your message. I use these details only to read your message and
+        reply to you. A copy is emailed to me through Resend, an email delivery
+        service that sends it on my behalf. Messages are deleted automatically
+        12 months after I receive them.
+      </p>
+      <p>
+        Giving me your details through the form is voluntary, but without an
+        email address I can’t reply. I make no automated decisions about you.
+      </p>
+
+      <h3>If you email me or download my CV</h3>
+      <p>
+        Email you send directly goes to <LegalContactLink /> from your own mail
+        app. The CV download is a file served from this site; you do not need
+        to register to get it.
       </p>
 
       <h3>Third parties on this site</h3>
       <p>
-        Fonts are served from this site, not from Google. I do not use Google
-        Analytics, advertising SDKs or any other third-party trackers. Hosts
-        that serve the site and its files (currently Vercel and Supabase) may
+        Fonts, images and files are served from this site, not from Google or
+        my file host. I do not use Google Analytics, advertising SDKs or any
+        other third-party trackers. The host that serves the site (Vercel) may
         keep standard request logs. Outbound links (for example GitHub or
         LinkedIn) are those services’ own pages.
       </p>
 
       <h3>How long we keep website data</h3>
       <p>
-        Page-visit records are kept for 12 months and then deleted. Messages
-        from the Hire me form and emails you send are kept only as long as
-        needed to reply and follow up.
+        Page-visit records are kept for 12 months and then deleted. Hire me
+        messages are deleted 12 months after I receive them. Emails you send me
+        directly are kept as ordinary correspondence and deleted when no longer
+        needed.
       </p>
 
       <h3>Who processes data for me</h3>
@@ -229,23 +249,79 @@ export function PrivacyPolicyContent({ showMarbl }: { showMarbl: boolean }) {
         transfers, as set out in their own terms.
       </p>
 
-      <h3>Your rights and children</h3>
+      <h3>Why I’m allowed to use it (lawful basis)</h3>
+      <ul>
+        <li>
+          <strong>Analytics:</strong> your consent (UK GDPR Article 6(1)(a)),
+          and consent under the PECR for the visit ID stored in your browser.
+          You can withdraw it at any time in Cookie settings.
+        </li>
+        <li>
+          <strong>Preferences</strong> (colour theme, sparkles): your consent.
+        </li>
+        <li>
+          <strong>Hire me messages and the email copy:</strong> my legitimate
+          interests (Article 6(1)(f)) in reading and replying to people who
+          contact me. Where you’re asking about a job or a contract, also steps
+          taken at your request before entering into a contract (Article 6(1)(b)).
+        </li>
+        <li>
+          <strong>Remembering your cookie choice:</strong> this storage is
+          strictly necessary, so I don’t ask you again on every page; it never
+          leaves your browser.
+        </li>
+        <li>
+          <strong>Hosting and security logs</strong> kept by my host: my
+          legitimate interests in keeping the site working and secure.
+        </li>
+      </ul>
+
+      <h3>Your rights</h3>
       <p>If UK GDPR applies to data I hold about you, you have the right to:</p>
       <ul>
         <li>ask for a copy of it (access)</li>
-        <li>ask me to correct it (correction)</li>
-        <li>ask me to delete it (deletion)</li>
-        <li>object to how I use it, including analytics (objection)</li>
+        <li>ask me to correct it (rectification)</li>
+        <li>ask me to delete it (erasure)</li>
+        <li>ask me to limit how I use it (restriction)</li>
         <li>
-          complain to the Information Commissioner’s Office at{' '}
-          <a href="https://ico.org.uk">ico.org.uk</a>
+          get the data you gave me, or analytics collected with your consent, in
+          a common machine-readable format (portability)
         </li>
       </ul>
       <p>
-        To use any of these rights, or to ask a question about your data, email
-        me at <LegalContactLink />. You can turn analytics off yourself at any
-        time from “Cookie settings”.
+        <strong>
+          You also have the right to object to how I use your data, including
+          to analytics, at any time.
+        </strong>
       </p>
+      <p>
+        Where I rely on your consent, you can withdraw it at any time from
+        “Cookie settings” at the bottom of every page, or by emailing me.
+        Withdrawing doesn’t affect anything done before you withdrew it.
+      </p>
+      <p>
+        To use any of these rights, or to ask a question about your data, email
+        me at <LegalContactLink />.
+      </p>
+
+      <h3>Complaints</h3>
+      <p>
+        If you’re unhappy with how I’ve handled your data, please email me first
+        at <LegalContactLink />. I’ll acknowledge your complaint within 30 days
+        and tell you the outcome without undue delay.
+      </p>
+      <p>
+        You can also complain to the Information Commissioner’s Office (ICO):
+      </p>
+      <ul>
+        <li>
+          Online: <a href="https://ico.org.uk/make-a-complaint/">ico.org.uk/make-a-complaint</a>
+        </li>
+        <li>Helpline: 0303 123 1113</li>
+        <li>Post: Information Commissioner’s Office, Wycliffe House, Water Lane, Wilmslow, Cheshire SK9 5AF</li>
+      </ul>
+
+      <h3>Children</h3>
       <p>
         This website is not directed at children under 13.
       </p>

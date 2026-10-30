@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { CSSProperties, ReactNode } from 'react'
 
 export const LEGAL_CONTACT_EMAIL = 'demi.21@outlook.com'
-export const LEGAL_EFFECTIVE_DATE = '12 September 2026'
+export const LEGAL_EFFECTIVE_DATE = '30 October 2026'
 export const LEGAL_SITE_URL = 'https://demitaylornimmo.com'
 
 type LegalPageProps = {

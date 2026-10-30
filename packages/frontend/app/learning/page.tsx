@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { fetchLearning, fetchSkills } from '@/lib/api'
 import type { Skill } from '@/lib/api'
 import LearningClient from './learning-client'
@@ -15,7 +18,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function Learning() {
   // Courses are the page's core (a failure goes to error.tsx); skills degrade to a note.
-  const learning = await fetchLearning()
+  const loaded = await loadOrUnavailable(fetchLearning)
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.learning} reference={loaded.reference} />
+  const learning = loaded.data
   let skills: Skill[] | null = null
   try {
     skills = await fetchSkills()

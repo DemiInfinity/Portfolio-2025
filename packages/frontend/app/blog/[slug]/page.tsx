@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { notFound } from 'next/navigation'
 import BlogPostClient from './BlogPostClient'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
@@ -30,7 +33,9 @@ async function getBlogPost(slug: string) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
-  const post = await getBlogPost(slug)
+  const loadedMeta = await loadOrUnavailable(() => getBlogPost(slug))
+  if (!loadedMeta.ok) return { title: 'Blog' }
+  const post = loadedMeta.data
 
   if (!post) {
     return {
@@ -80,7 +85,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params
-  const post = await getBlogPost(slug)
+  const loaded = await loadOrUnavailable(() => getBlogPost(slug))
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.blog} reference={loaded.reference} />
+  const post = loaded.data
 
   if (!post) {
     notFound()

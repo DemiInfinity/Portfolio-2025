@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { resolveMediaUrl } from './mediaUrl'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
   ? `${process.env.NEXT_PUBLIC_API_URL}/api`
@@ -25,7 +26,8 @@ export function useResumeAvailability(): { available: boolean; url: string | nul
         const data = await response.json()
         if (!cancelled) {
           setAvailable(Boolean(data.available))
-          setUrl(data.url ?? null)
+          // Served through this site's /media route (D-14), never straight from supabase.co.
+          setUrl(data.url ? resolveMediaUrl(data.url) || null : null)
         }
       } catch (error) {
         console.error('Error checking resume availability:', error)

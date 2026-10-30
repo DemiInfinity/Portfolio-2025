@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { startTransition, useEffect, useId, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { CSSProperties, ReactNode } from 'react'
 import Button from '@/components/ui/Button'
 import Spark from '@/components/ui/Spark'
@@ -48,6 +49,7 @@ export default function ErrorView({
   message = 'That one’s on me, not you. The page didn’t load properly. Give it another go in a moment.',
 }: ErrorBoundaryProps & { title?: ReactNode; message?: string }) {
   const overlay = useOptionalOverlay()
+  const router = useRouter()
   const [retrying, setRetrying] = useState(false)
   const digest = error?.digest
 
@@ -61,10 +63,16 @@ export default function ErrorView({
     return () => clearTimeout(t)
   }, [retrying])
 
+  // QA N-8: re-fetch the server data and clear the error inside one transition,
+  // as the Next docs recommend for error boundaries. Calling retry()/reset()
+  // outside a transition made React report #419 while the segment recovered.
   const tryAgain = () => {
     setRetrying(true)
-    if (retry) retry()
-    else reset?.()
+    startTransition(() => {
+      router.refresh()
+      if (reset) reset()
+      else retry?.()
+    })
   }
 
   return (

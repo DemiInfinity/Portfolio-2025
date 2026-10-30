@@ -1,5 +1,5 @@
 @admin
-Feature: Admin shell (T1, T3, T15, T17)
+Feature: Admin shell (T1, T3, T15, T17; Messages link from the AdminNav update)
   The sidebar, top bar, phone menu and page titles from AdminNav and AdminTop.
 
   Background:
@@ -19,7 +19,7 @@ Feature: Admin shell (T1, T3, T15, T17)
   Scenario: T3/T17 sidebar links, groups and order at 1280px
     Given the admin screen is 1280 by 800
     When the admin opens "/blog"
-    Then the admin sees that the sidebar links read "Dashboard, About, Projects, Blog, Work history, Education, Certifications, Learning, Analytics, Feature flags, Settings"
+    Then the admin sees that the sidebar links read "Dashboard, Messages 2 unread, About, Projects, Blog, Work history, Education, Certifications, Learning, Analytics, Feature flags, Settings"
     And the admin sees that the sidebar groups read "Content, Site"
     And the admin sees that only the sidebar link "Blog" is the current page
 
@@ -48,7 +48,7 @@ Feature: Admin shell (T1, T3, T15, T17)
     Then the admin sees that the page has no horizontal scroll
     And the admin sees that the sidebar is not visible
     When the admin clicks "Open menu"
-    Then the admin sees that the "Admin menu" sheet shows 11 links
+    Then the admin sees that the "Admin menu" sheet shows 12 links
     And the admin sees that the "Open menu" button is expanded
     When the admin clicks the sheet link "Education"
     Then the admin sees that the URL path is "/education"

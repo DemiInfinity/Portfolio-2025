@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { fetchEducation, fetchWorkHistory } from '@/lib/api'
 import ExperienceClient from './experience-client'
 
@@ -21,7 +24,9 @@ function byNewest<T extends { start_date: string; end_date?: string | null }>(a:
 }
 
 export default async function Experience() {
-  const [roles, education] = await Promise.all([fetchWorkHistory(), fetchEducation()])
+  const loaded = await loadOrUnavailable(() => Promise.all([fetchWorkHistory(), fetchEducation()]))
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.experience} reference={loaded.reference} />
+  const [roles, education] = loaded.data
   return <ExperienceClient roles={[...roles].sort(byNewest)} education={education} />
 }
 

@@ -12,7 +12,8 @@ import { ToastProvider } from '../ui/Toast'
 import { resetConsentMemory } from '@/lib/consent'
 
 const pathname = vi.hoisted(() => ({ value: '/' }))
-vi.mock('next/navigation', () => ({ usePathname: () => pathname.value }))
+const refresh = vi.hoisted(() => vi.fn())
+vi.mock('next/navigation', () => ({ usePathname: () => pathname.value, useRouter: () => ({ refresh }) }))
 
 const wrap = (ui: ReactNode) =>
   render(
@@ -41,17 +42,18 @@ describe('500', () => {
     expect(screen.queryByText(/quote this reference/)).not.toBeInTheDocument()
   })
 
-  it('Try again prefers retry() and falls back to reset()', async () => {
+  it('Try again refreshes the route and clears the error in one transition (QA N-8)', async () => {
     const retry = vi.fn()
     const reset = vi.fn()
+    refresh.mockClear()
     const { unmount } = wrap(<ErrorView error={new Error('x')} retry={retry} reset={reset} />)
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(retry).toHaveBeenCalled()
-    expect(reset).not.toHaveBeenCalled()
-    unmount()
-    wrap(<ErrorView error={new Error('x')} reset={reset} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(refresh).toHaveBeenCalled()
     expect(reset).toHaveBeenCalled()
+    unmount()
+    wrap(<ErrorView error={new Error('x')} retry={retry} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(retry).toHaveBeenCalled()
   })
 
   it('route-level titles are kept, and Let me know opens contact', async () => {

@@ -23,6 +23,7 @@ Feature: Admin screenshots for the visual review (1440 and 390)
       | analytics   | /analytics      | 1280 | 900  |
       | flags       | /feature-flags  | 1280 | 900  |
       | settings    | /settings       | 1280 | 900  |
+      | messages    | /messages       | 1280 | 900  |
       | dashboard   | /               | 390  | 844  |
       | about       | /about          | 390  | 844  |
       | projects    | /projects       | 390  | 844  |
@@ -35,6 +36,7 @@ Feature: Admin screenshots for the visual review (1440 and 390)
       | analytics   | /analytics      | 390  | 844  |
       | flags       | /feature-flags  | 390  | 844  |
       | settings    | /settings       | 390  | 844  |
+      | messages    | /messages       | 390  | 844  |
 
   Scenario Outline: sign in at <w>
     Given the admin API serves the content fixture

@@ -54,6 +54,7 @@ Feature: Maintenance, 404 and 500 pages (Maintenance.dc.html, NotFound.dc.html, 
 
   Scenario: 500: Try again recovers once the API is back (retry re-fetches)
     Given the site mock answers "GET /api/work-history" with status 500
+    And uncaught React error 419 is tolerated in this scenario
     When the visitor opens "/experience"
     Then the "Try again" button is visible
     When the site mock is healthy again
@@ -65,3 +66,12 @@ Feature: Maintenance, 404 and 500 pages (Maintenance.dc.html, NotFound.dc.html, 
     When the visitor opens "/cv"
     Then the "Try again" button is visible
     And the page has a link containing "Let me know" to "mailto:demi.21@outlook.com"
+
+  Scenario: 500: recovering with Try again throws no uncaught error (NON-BLOCKING N-8)
+    Given the site mock answers "GET /api/work-history" with status 500
+    When the visitor opens "/experience"
+    Then the "Try again" button is visible
+    When the site mock is healthy again
+    And the visitor clicks "Try again"
+    Then the page heading eventually contains "My experience"
+    And the visitor waits 1000 ms

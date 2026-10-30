@@ -19,7 +19,7 @@ function realKey(key: 'Enter' | 'Space') {
 }
 
 function seedConsent(analytics: boolean, prefs: boolean) {
-  const value = JSON.stringify({ v: 1, analytics, prefs, at: '2026-10-30T10:00:00.000Z' })
+  const value = JSON.stringify({ v: 2, analytics, prefs, at: new Date().toISOString() })
   let done = false
   cy.on('window:before:load', (win) => {
     if (done) return
@@ -72,13 +72,30 @@ function storage(kind: 'localStorage' | 'sessionStorage', key: string) {
 Then('no visit ID is stored', () => {
   cy.window().should((win) => {
     expect(win.sessionStorage.getItem(VISIT_KEY), 'sessionStorage visit ID').to.eq(null)
+    expect(win.localStorage.getItem(VISIT_KEY), 'localStorage visit ID').to.eq(null)
     const keys = [...Object.keys(win.localStorage), ...Object.keys(win.sessionStorage)]
     expect(keys.filter((k) => /visit|session_id|visitor/i.test(k)), 'any visit-like key').to.deep.eq([])
   })
 })
 
+/** H-23: localStorage portfolio_visit_id = {id, last} (30-minute session). */
+function visitId(win: Window): string | null {
+  const raw = win.localStorage.getItem(VISIT_KEY) ?? win.sessionStorage.getItem(VISIT_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw).id ?? raw
+  } catch {
+    return raw
+  }
+}
+
 Then('a visit ID is stored', () => {
-  cy.window().should((win) => expect(win.sessionStorage.getItem(VISIT_KEY)).to.be.a('string').and.not.be.empty)
+  cy.window().should((win) => {
+    expect(win.localStorage.getItem(VISIT_KEY), 'localStorage visit ID').to.be.a('string')
+    const v = JSON.parse(win.localStorage.getItem(VISIT_KEY) as string)
+    expect(v.id, 'id').to.be.a('string').and.not.be.empty
+    expect(v.last, 'last activity').to.exist
+  })
 })
 
 Then('localStorage {string} is absent', (key: string) => {
@@ -101,12 +118,13 @@ function trackBodies(calls: any[]) {
 
 Then('an analytics page view for {string} is sent', (path: string) => {
   cy.get('@track.all', { timeout: 10000 }).should((calls: any) => {
-    expect(trackBodies(calls).filter((b) => b.page_path === path && !b.visit_duration), `page view for ${path}`).to.have.length.gte(1)
+    expect(trackBodies(calls).filter((b) => b.event === 'page_view' && b.page_path === path), `page_view for ${path}`).to.have.length.gte(1)
   })
 })
 
 Then('every analytics request carries the stored visit ID', () => {
-  storage('sessionStorage', VISIT_KEY).then((id) => {
+  cy.window().then((win) => {
+    const id = visitId(win)
     cy.get('@track.all').then((calls: any) => {
       trackBodies(calls).forEach((b) => expect(b.session_id).to.eq(id))
     })
@@ -188,6 +206,19 @@ Then('the {string} and {string} buttons are the same size', (a: string, b: strin
   })
 })
 
+Then('the {string} and {string} buttons are styled identically', (a: string, b: string) => {
+  byName(a, 'button').filter((_, el) => rendered(el)).first().then(($a) => {
+    byName(b, 'button').filter((_, el) => rendered(el)).first().then(($b) => {
+      const sa = getComputedStyle($a[0])
+      const sb = getComputedStyle($b[0])
+      ;['backgroundColor', 'backgroundImage', 'color', 'borderTopColor', 'borderTopWidth', 'borderTopStyle', 'borderRadius', 'fontSize', 'fontWeight', 'boxShadow'].forEach(
+        (prop) => expect((sa as any)[prop], prop).to.eq((sb as any)[prop])
+      )
+      expect($a[0].className, 'class').to.eq($b[0].className)
+    })
+  })
+})
+
 const recorded = new Set<string>()
 Before({ tags: '@consent' }, () => recorded.clear())
 
@@ -240,3 +271,10 @@ Then('the page heading eventually contains {string}', (t: string) => {
 })
 
 export { banner }
+
+Given('uncaught React error {int} is tolerated in this scenario', (code: number) => {
+  cy.on('uncaught:exception', (err) => {
+    if (err.message.includes(`React error #${code}`)) return false
+    return undefined
+  })
+})

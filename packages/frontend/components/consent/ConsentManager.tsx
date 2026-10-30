@@ -71,7 +71,7 @@ function SettingsDialog({
           <div style={{ flex: 1 }}>
             <h3 style={{ fontSize: 16 }}>Analytics</h3>
             <p style={{ marginTop: 4, fontSize: 'var(--t-sm)', lineHeight: 1.6 }}>
-              Pages viewed, time on page, the site you came from, your browser type, a shortened IP address and a random visit ID. Kept in my own database for 12 months, then deleted. No third-party tools.
+              Pages viewed, time on page, the site you came from, your browser type, a shortened IP address (the last part removed) and a random visit ID. Kept in my own database for 12 months, then deleted. No third-party tools.
             </p>
           </div>
           <Switch checked={analytics} label="Analytics" onToggle={() => setAnalytics((v) => !v)} />
@@ -88,10 +88,10 @@ function SettingsDialog({
       </ul>
       <div style={{ padding: '16px 28px 26px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid #efe6fb', marginTop: 4 }}>
         <div className="consent-row">
-          <button type="button" className="consent-btn consent-ghost" onClick={() => onDecide(false, false, CONSENT_COPY.rejected)}>
+          <button type="button" className="consent-btn consent-choice" onClick={() => onDecide(false, false, CONSENT_COPY.rejected)}>
             Reject all
           </button>
-          <button type="button" className="consent-btn consent-ghost" onClick={() => onDecide(true, true, CONSENT_COPY.accepted)}>
+          <button type="button" className="consent-btn consent-choice" onClick={() => onDecide(true, true, CONSENT_COPY.accepted)}>
             Allow all
           </button>
         </div>
@@ -176,19 +176,29 @@ export default function ConsentManager() {
             </svg>
             <h2 id={titleId} className="serif" style={{ fontSize: 22 }}>{CONSENT_COPY.bannerTitle}</h2>
           </div>
-          <p style={{ fontSize: 'var(--t-meta)', lineHeight: 1.6 }}>{CONSENT_COPY.bannerBody}</p>
+          <p style={{ fontSize: 'var(--t-meta)', lineHeight: 1.6 }}>
+            {CONSENT_COPY.bannerBody}{' '}
+            <Link href="/privacy" style={{ color: '#5b21b6', fontWeight: 600 }}>
+              How I use it
+            </Link>
+          </p>
           {gpc && <p className="consent-note">{CONSENT_COPY.gpcNote}</p>}
           <div className="consent-row">
-            <button type="button" className="consent-btn consent-ghost" onClick={() => decide(false, false, CONSENT_COPY.rejected)}>
+            {/* D-13: Reject and Accept look identical (same class, size, weight and contrast). */}
+            <button type="button" className="consent-btn consent-choice" onClick={() => decide(false, false, CONSENT_COPY.rejected)}>
               No thanks
             </button>
-            <button type="button" className="consent-btn consent-solid" onClick={() => decide(true, true, CONSENT_COPY.accepted)}>
+            {/* MUST-2: analytics only; Preferences stays off unless chosen in Cookie settings. */}
+            <button type="button" className="consent-btn consent-choice" onClick={() => decide(true, false, CONSENT_COPY.accepted)}>
               Allow analytics
             </button>
           </div>
           <button ref={bannerTrigger} type="button" className="consent-link" style={{ alignSelf: 'flex-start' }} onClick={openSettings}>
             Choose what’s allowed
           </button>
+          <p style={{ fontSize: 'var(--t-sm)', color: '#6b5a7e', marginTop: -8 }}>
+            “Choose what’s allowed” also covers Preferences: remembering small choices like the colour theme.
+          </p>
         </section>
       )}
       {settingsOpen && (

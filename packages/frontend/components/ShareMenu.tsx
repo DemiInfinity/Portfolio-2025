@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useToast } from '@/components/ui/Toast'
 
@@ -79,7 +80,7 @@ export default function ShareMenu({ url, title, emailSubject, label, variant = '
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [canNativeShare, setCanNativeShare] = useState(false)
-  const [shift, setShift] = useState(0)
+  const [position, setPosition] = useState<{ top: number; left: number; up: boolean } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -89,7 +90,7 @@ export default function ShareMenu({ url, title, emailSubject, label, variant = '
 
   const close = useCallback((returnFocus = true) => {
     setOpen(false)
-    setShift(0)
+    setPosition(null)
     if (returnFocus) buttonRef.current?.focus()
   }, [])
 
@@ -98,30 +99,60 @@ export default function ShareMenu({ url, title, emailSubject, label, variant = '
     setOpen(true)
   }
 
-  // Focus the first item once open, and keep the menu on screen (390px phones).
-  useLayoutEffect(() => {
-    if (!open) return
+  /**
+   * QA B-4: the panel is portalled to <body> with fixed positioning, so no
+   * animated or transformed ancestor (stacking context) can draw over it.
+   * Placed against the trigger, flipped above when there isn't room below,
+   * clamped 16px inside the viewport (390px phones), and re-placed on scroll
+   * and resize.
+   */
+  const place = useCallback(() => {
     const menu = menuRef.current
-    const wrap = wrapRef.current
-    if (menu && wrap) {
-      // Measure from the wrapper and the menu's layout width: the menu itself is
-      // mid scale-in animation here, so its bounding box is not its final size.
-      const box = wrap.getBoundingClientRect()
-      const width = menu.offsetWidth
-      const left = align === 'end' ? box.right - width : box.left
-      const vw = document.documentElement.clientWidth || window.innerWidth
-      let dx = 0
-      if (left + width > vw - 16) dx = vw - 16 - (left + width)
-      if (left + dx < 16) dx = 16 - left
-      setShift(dx)
+    const button = buttonRef.current
+    if (!menu || !button) return
+    const box = button.getBoundingClientRect()
+    const width = menu.offsetWidth
+    const height = menu.offsetHeight
+    const vw = document.documentElement.clientWidth || window.innerWidth
+    const vh = window.innerHeight
+    const gap = 10
+    let left = align === 'end' ? box.right - width : box.left
+    left = Math.min(Math.max(16, left), Math.max(16, vw - 16 - width))
+    const roomBelow = vh - box.bottom - gap
+    const roomAbove = box.top - gap
+    const flip = up ? roomAbove >= height || roomAbove > roomBelow : roomBelow < height && roomAbove > roomBelow
+    const top = flip ? box.top - gap - height : box.bottom + gap
+    setPosition({ top: Math.round(top), left: Math.round(left), up: flip })
+  }, [align, up])
+
+  // Place the panel first (it is hidden until placed, and hidden elements can't take focus)...
+  useLayoutEffect(() => {
+    if (open) place()
+  }, [open, place])
+
+  // ...then focus the first item, once, when it has become visible.
+  const placed = position !== null
+  useLayoutEffect(() => {
+    if (open && placed) items()[0]?.focus({ preventScroll: true })
+  }, [open, placed])
+
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
     }
-    items()[0]?.focus()
-  }, [open, align])
+  }, [open, place])
 
   useEffect(() => {
     if (!open) return
     const onPointer = (event: MouseEvent | TouchEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) close(false)
+      const target = event.target as Node
+      // The panel lives in a portal, so "inside" means the trigger's wrapper or the panel.
+      if (wrapRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      close(false)
     }
     document.addEventListener('mousedown', onPointer)
     document.addEventListener('touchstart', onPointer)
@@ -205,14 +236,16 @@ export default function ShareMenu({ url, title, emailSubject, label, variant = '
         <ShareIcon />
         Share
       </button>
-      {open && (
+      {open &&
+        createPortal(
         <div
           ref={menuRef}
           id={menuId}
           role="menu"
           aria-label={label}
-          className={`share-menu align-${align}${up ? ' up' : ''}`}
-          style={shift ? { translate: `${shift}px 0` } : undefined}
+          className={`share-menu share-menu-portal${position?.up ? ' up' : ''}`}
+          // Hidden for the first layout pass, until it has been placed.
+          style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: 'hidden' }}
           onKeyDown={onMenuKeyDown}
         >
           <a className="share-item" role="menuitem" tabIndex={-1} href={linkedInShareUrl(url)} target="_blank" rel="noopener noreferrer" onClick={() => close(false)}>
@@ -263,8 +296,9 @@ export default function ShareMenu({ url, title, emailSubject, label, variant = '
               </button>
             </>
           )}
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </div>
   )
 }

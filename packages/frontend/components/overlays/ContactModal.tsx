@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import Modal from './Modal'
@@ -220,6 +221,12 @@ export default function ContactModal({ onClose }: { onClose: () => void }) {
               <a href={`mailto:${contact.email}`} style={{ color: '#5b21b6', fontWeight: 600 }}>
                 {contact.email}
               </a>
+            </p>
+            <p style={{ margin: 0, fontSize: 12, textAlign: 'center', color: '#6b5a7e' }}>
+              I keep your message for 12 months so I can reply.{' '}
+              <Link href="/privacy" onClick={onClose} style={{ color: '#5b21b6', fontWeight: 600 }}>
+                Privacy
+              </Link>
             </p>
           </div>
         </form>

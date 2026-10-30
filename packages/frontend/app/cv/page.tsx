@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { fetchCv } from '@/lib/api'
 import type { CvData } from '@/lib/api'
 import { formatRange } from '@/lib/format'
@@ -221,6 +224,8 @@ export function CvSheets({ cv }: { cv: CvData }) {
 }
 
 export default async function CvPage() {
-  const cv = await fetchCv()
+  const loaded = await loadOrUnavailable(fetchCv)
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.cv} reference={loaded.reference} />
+  const cv = loaded.data
   return <CvSheets cv={cv} />
 }

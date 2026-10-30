@@ -97,18 +97,19 @@ Feature: Design details from the plan's Work notes (F-3 to F-19)
     When the visitor opens "/blog"
     Then there is no search box
 
-  Scenario: F-17 Share falls back to copying the link
+  Scenario: F-17 Share (menu): Copy link copies the post URL and shows the toast
     When the visitor opens "/blog/shipping-a-desktop-app"
-    And the visitor removes navigator.share
     And the visitor stubs the clipboard
-    And the visitor clicks "Share"
+    And the visitor opens the share menu "Share this post"
+    And the visitor chooses "Copy link" in the share menu
     Then the clipboard received "SITE/blog/shipping-a-desktop-app"
-    And the toast says "Link copied to your clipboard"
+    And the toast says "Link copied"
 
-  Scenario: F-17 Share uses navigator.share when present
+  Scenario: F-17 Share (menu): More options uses navigator.share when present
     When the visitor opens "/blog/shipping-a-desktop-app"
     And the visitor stubs navigator.share
-    And the visitor clicks "Share"
+    And the visitor opens the share menu "Share this post"
+    And the visitor chooses "More options" in the share menu
     Then navigator.share was called with the post URL "SITE/blog/shipping-a-desktop-app"
 
   Scenario: F-19 contact strip, learning line and recommendation caption

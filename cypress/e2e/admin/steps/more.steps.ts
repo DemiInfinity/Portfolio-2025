@@ -103,7 +103,7 @@ When('the admin focuses the bar {string}', (name: string) => {
 })
 
 Then('the admin sees the referrer list reads {string}', (list: string) => {
-  cy.get('ul.blist > li').should(($li) => {
+  cy.contains('h2', 'Where visits come from').closest('section').find('ul.blist').first().children('li').should(($li) => {
     const names = $li.toArray().map((l) => norm((l.querySelector('span') as HTMLElement)?.textContent || ''))
     expect(names).to.deep.eq(list.split(', '))
   })

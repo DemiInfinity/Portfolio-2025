@@ -190,3 +190,27 @@ Then('the main landmark is never empty while {string} loads', (path: string) => 
     expect($m[0].querySelector('[role="status"]'), `loader in main; main has ${$m[0].children.length} children, html: ${html.slice(0, 300)}`).to.exist
   })
 })
+
+Then('the loader is in the main landmark within {int} ms of the click', (ms: number) => {
+  cy.get('main [role="status"], main ~ [role="status"], [role="status"]', { timeout: ms }).should(($s) => {
+    const loader = Array.from($s).find((el) => /Waking the server/.test(el.textContent || ''))
+    expect(loader, 'the "Waking the server…" loader').to.exist
+  })
+})
+
+Then('the loader stays until the page heading is {string}', (heading: string) => {
+  // Poll every 100 ms until the page renders; at every poll either the loader or the new page must be on screen.
+  const check = (left: number): void => {
+    cy.document({ log: false }).then((doc) => {
+      const h1 = doc.querySelector('main h1')
+      if (h1 && norm(h1.textContent).includes(heading)) return
+      const main = doc.querySelector('main')
+      const loader = Array.from(doc.querySelectorAll('[role="status"]')).some((el) => /Waking the server/.test(el.textContent || ''))
+      const mainText = norm(main?.textContent)
+      expect(loader, `loader still on screen until the page renders (main: "${mainText.slice(0, 80)}")`).to.eq(true)
+      expect(left, 'page rendered within 15 s').to.be.greaterThan(0)
+      cy.wait(100, { log: false }).then(() => check(left - 1))
+    })
+  }
+  check(150)
+})

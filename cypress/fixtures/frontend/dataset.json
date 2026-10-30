@@ -8,8 +8,8 @@
       "slug": "lunalore",
       "title": "LunaLore",
       "description": "A world-building companion for writers, on desktop and the web.",
-      "image": "/uploads/lunalore.svg",
-      "images": ["/uploads/luna-g1.svg"],
+      "image": "https://qarefabcdef123456.supabase.co/storage/v1/object/public/portfolio-media/projects/lunalore.png",
+      "images": ["https://qarefabcdef123456.supabase.co/storage/v1/object/public/portfolio-media/projects/luna-g1.png"],
       "technologies": ["Electron", "React", "Node.js", "PostgreSQL"],
       "github_url": "https://github.com/DemiInfinity/lunalore",
       "live_url": "https://lunalore.app",
@@ -28,7 +28,7 @@
         "problem": "Writers juggle notes across **five apps**.",
         "how_might_we": "How might we keep a whole fictional world in one calm place?",
         "process": [
-          { "label": "Discover", "title": "Talking to creators", "body": "Interviews with 12 writers.", "image": "/uploads/p1.svg", "image_alt": "Interview notes" },
+          { "label": "Discover", "title": "Talking to creators", "body": "Interviews with 12 writers.", "image": "https://qarefabcdef123456.supabase.co/storage/v1/object/public/portfolio-media/projects/p1.png", "image_alt": "Interview notes" },
           { "label": "Define", "title": "Mapping the mess", "body": "Affinity mapping.", "image": null, "image_alt": "" },
           { "label": "Design", "title": "Sketching the shelf", "body": "Paper prototypes.", "image": null },
           { "label": "Build", "title": "Shipping the beta", "body": "Electron and web from one codebase.", "image": null }
@@ -163,7 +163,7 @@
       "category": "Desktop",
       "tags": ["electron", "velopack"],
       "featured": true,
-      "cover_image": "/uploads/b1.svg",
+      "cover_image": "https://qarefabcdef123456.supabase.co/storage/v1/object/public/portfolio-media/blog/b1.png",
       "publish_date": "2026-01-07T09:00:00.000Z",
       "created_at": "2026-01-07T09:00:00.000Z"
     },

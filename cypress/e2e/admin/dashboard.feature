@@ -5,6 +5,7 @@ Feature: Dashboard (T5, T21)
     Given the admin API serves the content fixture
     And today is "2026-10-27T09:00:00" for the admin
     And the admin is signed in
+    And the admin fixture has every message read
 
   Scenario: KPI values and captions from the fixture
     When the admin opens "/"
@@ -91,3 +92,13 @@ Feature: Dashboard (T5, T21)
     Then the admin sees that the KPI strip has 2 columns
     And the admin sees that the page has no horizontal scroll
     And the admin sees that the Needs attention pills are hidden
+
+  Scenario: Unread messages lead Needs attention (H-24), count only
+    Given the admin fixture has "messages[1].read" set to "false"
+    And the admin fixture has "messages[0].read" set to "false"
+    When the admin opens "/"
+    Then the admin sees that the Needs attention count reads "5"
+    And the admin sees the first Needs attention row reads "2 unread messages" with "Read messages"
+    And the admin sees no text "frontend role at a fintech" on the page
+    When the admin clicks "Read messages"
+    Then the admin sees that the URL path is "/messages"

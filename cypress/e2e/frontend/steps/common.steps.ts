@@ -24,6 +24,9 @@ import {
 let flags: Record<string, boolean> = {}
 
 Before({ tags: '@site' }, () => {
+  // Let the previous scenario's pagehide beacons (analytics view_update) drain before this
+  // scenario's intercepts are registered, so they are never counted here.
+  cy.wait(600, { log: false })
   mockReset()
   dataset().then((d) => {
     flags = { ...d.flags }
@@ -520,9 +523,14 @@ Then('every {string} element has animation-name {string}', (selector: string, va
 // ---------- analytics, maintenance, mock log ----------
 
 Then('no analytics request was sent', () => {
-  cy.get('@track.all').should('have.length', 0)
-  mockRequests().then((log: any[]) => {
-    expect(log.filter((r) => r.method === 'POST' && r.path === '/api/analytics/track')).to.have.length(0)
+  // Browser-side intercept only: the mock log can hold late pagehide beacons from the previous scenario's page.
+  // A view_update for a view this scenario never started is the previous scenario's page
+  // closing (its pagehide beacon lands after the next visit begins); it is not this page's tracking.
+  cy.get('@track.all').should((calls: any) => {
+    const bodies = calls.map((c: any) => (typeof c.request.body === 'string' ? JSON.parse(c.request.body) : c.request.body))
+    const started = new Set(bodies.filter((b: any) => b.event !== 'view_update').map((b: any) => b.view_id))
+    const own = bodies.filter((b: any) => b.event !== 'view_update' || started.has(b.view_id))
+    expect(own.length, `analytics requests: ${JSON.stringify(own)}`).to.eq(0)
   })
 })
 

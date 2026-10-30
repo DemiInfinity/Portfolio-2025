@@ -7,11 +7,19 @@
  *
  * Versioning: bump CONSENT_VERSION whenever the banner/settings wording or the
  * categories change. A stored choice with another `v` is ignored, so every
- * visitor is asked again under the new wording.
+ * visitor is asked again under the new wording. v2 (30 Oct 2026): the banner's
+ * "Allow analytics" no longer grants Preferences (compliance MUST-2).
+ *
+ * Expiry (D-12): a choice older than six months at page load is ignored, so the
+ * banner shows again on the next visit.
  */
 
 export const CONSENT_KEY = 'portfolio_consent'
-export const CONSENT_VERSION = 1
+export const CONSENT_VERSION = 2
+/** D-12: a stored choice is asked again after six months. */
+export const CONSENT_MAX_AGE_MS = 182 * 24 * 60 * 60 * 1000
+/** Expiry is judged against the page load, so nobody is re-asked in the middle of a visit. */
+const PAGE_LOADED_AT = Date.now()
 /** The old opt-out flag ('1' = analytics off). Migrated once, then removed. */
 export const LEGACY_OPT_OUT_KEY = 'portfolio_analytics_opt_out'
 /** The visit (session) id and its last activity, { id, last }. Created only after analytics consent; removed when it is withdrawn. */
@@ -36,9 +44,17 @@ function storage(): Storage | null {
   }
 }
 
-function isConsent(value: unknown): value is Consent {
+function isConsent(value: unknown, loadedAt: number = PAGE_LOADED_AT): value is Consent {
   const c = value as Consent
-  return Boolean(c) && typeof c === 'object' && c.v === CONSENT_VERSION && typeof c.analytics === 'boolean' && typeof c.prefs === 'boolean'
+  if (!c || typeof c !== 'object' || c.v !== CONSENT_VERSION || typeof c.analytics !== 'boolean' || typeof c.prefs !== 'boolean') return false
+  const at = Date.parse(c.at)
+  // Choices made during this visit are always valid; older ones expire after six months.
+  return Number.isFinite(at) && loadedAt - at < CONSENT_MAX_AGE_MS
+}
+
+/** Exposed for tests: would this stored value count as a current choice at `loadedAt`? */
+export function isCurrentConsent(value: unknown, loadedAt: number): boolean {
+  return isConsent(value, loadedAt)
 }
 
 /** The current choice, or null when the visitor hasn't chosen yet (or it can't be read). */

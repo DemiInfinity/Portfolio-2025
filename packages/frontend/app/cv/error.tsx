@@ -2,7 +2,8 @@
 
 import ErrorView from '@/components/ErrorView'
 import type { ErrorBoundaryProps } from '@/components/ErrorView'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 
 export default function Error(props: ErrorBoundaryProps) {
-  return <ErrorView {...props} title="Couldn't load the CV" />
+  return <ErrorView {...props} {...ROUTE_ERRORS.cv} />
 }

@@ -4,6 +4,7 @@ import { screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Analytics from '../Analytics'
 import Projects from '../Projects'
+import Messages from '../Messages'
 import { renderApp } from '@/test/utils'
 import { api } from '@/lib/api'
 import { SAMPLE } from '@/test/fixtures'
@@ -76,5 +77,38 @@ describe('QA: Projects (T6, T20)', () => {
     expect(body.technologies).toEqual(['A', 'B', 'C'])
     expect(body.images).toEqual(['https://x/1.png', 'https://x/2.png'])
     expect(body.show_on_site).toBe(true)
+  })
+})
+
+describe('QA: Messages inbox (H-24)', () => {
+  const MSGS = [
+    { id: 7, name: 'Sam Carter', email: 'sam@agency.example', kind: 'role', source_path: '/', created_at: '2026-10-27T09:15:00', read: false, email_status: 'sent', message: 'A frontend role.' },
+  ]
+  beforeEach(() => vi.clearAllMocks())
+
+  it('rolls the read state back and toasts when the PATCH fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.get).mockImplementation(async (url: string) =>
+      (url.includes('unread-count')
+        ? { data: { success: true, unread: 1 } }
+        : { data: { success: true, data: MSGS.map((m) => ({ ...m })), unread: 1 } }) as never,
+    )
+    ;(api as unknown as { patch: ReturnType<typeof vi.fn> }).patch = vi.fn().mockRejectedValue({ response: { status: 500, data: { success: false } } })
+    renderApp(<Messages />, { route: '/messages' })
+    await user.click(await screen.findByRole('button', { name: /Sam Carter/ }))
+    await waitFor(() => expect(document.querySelector('.toast')).toHaveTextContent("Couldn't update the message. Try again."))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Sam Carter/ })).toHaveTextContent('Unread'))
+    expect(screen.getByRole('button', { name: 'Mark as read' })).toBeInTheDocument()
+  })
+
+  it('shows the load error and Try again refetches', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.get)
+      .mockRejectedValueOnce({ response: { status: 500 } })
+      .mockResolvedValue({ data: { success: true, data: MSGS, unread: 1 } } as never)
+    renderApp(<Messages />, { route: '/messages' })
+    expect(await screen.findByText(/Couldn't load the messages\./)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('button', { name: /Sam Carter/ })).toBeInTheDocument()
   })
 })

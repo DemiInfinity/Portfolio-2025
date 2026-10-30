@@ -37,17 +37,18 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     And no analytics request was sent
     And no visit ID is stored
 
-  Scenario: "Allow analytics": tracking starts from the next page view
-    When the visitor opens "/"
-    And the visitor clicks "Allow analytics"
+  Scenario: "Allow analytics" grants analytics only and tracks the landing page at once (H-23)
+    When the visitor opens "/projects"
+    And the visitor waits 1000 ms
+    Then no analytics request was sent
+    When the visitor clicks "Allow analytics"
     Then the toast says "Thanks! Analytics is on."
     And the consent banner is not shown
-    And the stored consent has analytics "true" and preferences "true"
-    And the visitor waits 1500 ms
-    And no analytics request was sent
-    When the visitor clicks "Projects" in the "Main" nav
-    Then an analytics page view for "/projects" is sent
+    And the stored consent has analytics "true" and preferences "false"
+    And an analytics page view for "/projects" is sent
     And a visit ID is stored
+    When the visitor clicks "Experience" in the "Main" nav
+    Then an analytics page view for "/experience" is sent
     And every analytics request carries the stored visit ID
 
   Scenario: Withdrawing in Cookie settings removes the visit ID and stops tracking at once
@@ -121,12 +122,25 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     And localStorage "portfolio_consent" is absent
     And no analytics request was sent
 
-  Scenario: A stored choice from another consent version is ignored, so the visitor is asked again
-    Given the visitor has "portfolio_consent" set to "{\"v\":0,\"analytics\":true,\"prefs\":true,\"at\":\"2026-01-01T00:00:00.000Z\"}" in localStorage
+  Scenario: A stored v1 choice is ignored (CONSENT_VERSION 2), so the visitor is asked again
+    Given the visitor has "portfolio_consent" set to "{\"v\":1,\"analytics\":true,\"prefs\":true,\"at\":\"2026-01-01T00:00:00.000Z\"}" in localStorage
     When the visitor opens "/"
     Then the consent banner is shown
     And the visitor waits 1000 ms
     And no analytics request was sent
+
+  Scenario: A choice older than six months expires and the banner returns
+    Given the visitor has "portfolio_consent" set to "{\"v\":2,\"analytics\":true,\"prefs\":true,\"at\":\"2026-04-01T00:00:00.000Z\"}" in localStorage
+    When the visitor opens "/"
+    Then the consent banner is shown
+    And the visitor waits 1000 ms
+    And no analytics request was sent
+
+  Scenario: A choice five months old still holds
+    Given the visitor has "portfolio_consent" set to "{\"v\":2,\"analytics\":false,\"prefs\":false,\"at\":\"2026-06-01T00:00:00.000Z\"}" in localStorage
+    When the visitor opens "/"
+    And the visitor waits 1000 ms
+    Then the consent banner is not shown
 
   Scenario: Preferences off: the colourway works for the visit but isn't remembered
     Given the site flag "show_colourways" is on
@@ -138,10 +152,18 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     When the visitor reloads the page
     Then the swatch "Lilac" is pressed
 
-  Scenario: Preferences on: the colourway is remembered
+  Scenario: Banner "Allow analytics" leaves preferences off, so the colourway isn't remembered
     Given the site flag "show_colourways" is on
     When the visitor opens "/"
     And the visitor clicks "Allow analytics"
+    And the visitor clicks "Rose"
+    Then localStorage "home_colourway" is absent
+
+  Scenario: Preferences on (Allow all): the colourway is remembered
+    Given the site flag "show_colourways" is on
+    When the visitor opens "/"
+    And the visitor clicks "Choose what’s allowed"
+    And the visitor clicks "Allow all"
     And the visitor clicks "Rose"
     Then localStorage "home_colourway" is "Rose"
     When the visitor reloads the page
@@ -166,7 +188,7 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     Then "No thanks" is reachable with Tab within 60 presses
     When the visitor focuses "Allow analytics" and presses Enter
     Then the consent banner is not shown
-    And the stored consent has analytics "true" and preferences "true"
+    And the stored consent has analytics "true" and preferences "false"
 
   Scenario: Settings by keyboard: opens from the banner, traps focus, Escape returns focus to the opener
     When the visitor opens "/"
@@ -198,10 +220,11 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     Then the dialog shows "Always on"
     And there is no enabled "Essential" switch
 
-  Scenario Outline: "No thanks" and "Allow analytics" carry equal weight at <screen>
+  Scenario Outline: "No thanks" and "Allow analytics" are styled identically at <screen>
     Given the visitor uses a <screen> screen
     When the visitor opens "/"
     Then the "No thanks" and "Allow analytics" buttons are the same size
+    And the "No thanks" and "Allow analytics" buttons are styled identically
 
     Examples:
       | screen  |
@@ -212,13 +235,15 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     When the visitor opens "/"
     And the visitor clicks "Choose what’s allowed"
     Then the "Reject all" and "Allow all" buttons are the same size
+    And the "Reject all" and "Allow all" buttons are styled identically
 
   Scenario: The /privacy storage table lists every key the site actually stores
     Given the site flag "show_colourways" is on
     And the visitor has "portfolio_analytics_opt_out" set to "0" in localStorage
     When the visitor opens "/"
     And the visitor records the storage keys
-    And the visitor clicks "Allow analytics"
+    And the visitor clicks "Choose what’s allowed"
+    And the visitor clicks "Allow all"
     And the visitor clicks "Rose"
     And the visitor records the storage keys
     And the visitor clicks "Blog" in the "Main" nav
@@ -226,10 +251,12 @@ Feature: Opt-in consent for analytics and preferences (PECR / UK GDPR; Consent.d
     And the visitor opens "/blog/shipping-a-desktop-app"
     And the visitor clicks the sparkle button
     And the visitor records the storage keys
+    And the visitor opens "/?exclude_me=1"
+    And the visitor records the storage keys
     And the visitor opens "/privacy"
     And the visitor records the storage keys
     Then the storage table on /privacy names every recorded key
-    And the recorded keys include "portfolio_consent, portfolio_visit_id, home_colourway, post_sparkle:shipping-a-desktop-app"
+    And the recorded keys include "portfolio_consent, portfolio_visit_id, home_colourway, post_sparkle:shipping-a-desktop-app, portfolio_exclude_me"
 
   Scenario: /privacy shows the current state and opens Cookie settings
     When the visitor opens "/privacy"

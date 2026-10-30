@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+import RouteError from '@/components/RouteError'
+import { loadOrUnavailable } from '@/lib/load'
+import { ROUTE_ERRORS } from '@/lib/routeErrors'
 import { fetchProjects } from '@/lib/api'
 import ProjectsClient from './projects-client'
 
@@ -14,7 +17,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function Projects() {
   // H-19: the API returns only public projects, in display order.
-  const projects = await fetchProjects()
+  const loaded = await loadOrUnavailable(fetchProjects)
+  if (!loaded.ok) return <RouteError {...ROUTE_ERRORS.projects} reference={loaded.reference} />
+  const projects = loaded.data
   return <ProjectsClient projects={projects} />
 }
 

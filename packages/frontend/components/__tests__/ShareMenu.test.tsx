@@ -133,3 +133,29 @@ describe('ShareMenu', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 })
+
+describe('ShareMenu portal (QA B-4)', () => {
+  it('renders the panel in document.body, outside any page stacking context', async () => {
+    renderMenu()
+    await userEvent.click(shareButton())
+    const menu = screen.getByRole('menu')
+    expect(menu.parentElement).toBe(document.body)
+    expect(menu).toHaveClass('share-menu-portal')
+    expect(menu.style.visibility).not.toBe('hidden')
+    expect(screen.getAllByRole('menuitem')[0]).toHaveFocus()
+  })
+
+  it('a click inside the portalled panel does not count as an outside click', async () => {
+    renderMenu()
+    await userEvent.click(shareButton())
+    fireEvent.mouseDown(screen.getByRole('menu'))
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
+  it('Tab from inside the menu closes it', async () => {
+    renderMenu()
+    await userEvent.click(shareButton())
+    await userEvent.tab()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
