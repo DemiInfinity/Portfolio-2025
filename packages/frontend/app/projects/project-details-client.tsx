@@ -1,285 +1,279 @@
-'use client'
-
-import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, ExternalLink, Image as ImageIcon } from 'lucide-react'
-import { GithubIcon } from '@/components/BrandIcons'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { Fragment } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import Button from '@/components/ui/Button'
+import Spark from '@/components/ui/Spark'
+import Markdown, { extractToc } from '@/components/Markdown'
+import ProcessTabs from '@/components/case-study/ProcessTabs'
+import { caseStudyToc, normaliseCaseStudy } from '@/components/case-study/caseStudy'
+import { CASE_STUDY_HERO_ID } from '@/components/SiteHeader'
+import type { Project } from '@/lib/api'
+import { formatMonthYear } from '@/lib/format'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 
-type Project = {
-  id: number
-  title: string
-  description: string
-  image?: string | null
-  images?: string[]
-  technologies?: string[]
-  github_url?: string | null
-  live_url?: string | null
-  date?: string | null
-  featured?: boolean
-  inspiration?: string | null
-  content?: string | null
-}
+const twinkle = (style: CSSProperties, d: string) => ({ ...style, ['--d' as string]: d }) as CSSProperties
+const delay = (ms: number) => ({ ['--d' as string]: `${ms}ms` }) as CSSProperties
+const H2: CSSProperties = { fontSize: 'var(--t-h2)' }
+const COLUMN: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 24 }
 
-function formatProjectDate(dateString: string) {
-  const [year, month, day] = dateString.split('-')
-  const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-}
-
-export default function ProjectDetailsClient({ project }: { project: Project }) {
-  const hero = project.image ? resolveMediaUrl(project.image) : ''
-  const gallery = Array.isArray(project.images) ? project.images : []
-
+function Section({ id, title, children, style }: { id: string; title?: string; children: ReactNode; style?: CSSProperties }) {
   return (
-    <div
-      className="min-h-screen py-20"
-      style={{ background: 'linear-gradient(135deg, #f8f4ff 0%, #fff8f0 50%, #ffb3ba 100%)' }}
-    >
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 text-4xl opacity-15 float-animation">💻</div>
-        <div className="absolute top-40 right-20 text-3xl opacity-20 sparkle-animation">✨</div>
-        <div className="absolute bottom-40 left-20 text-5xl opacity-10 float-animation">🚀</div>
-        <div className="absolute bottom-20 right-10 text-3xl opacity-15 sparkle-animation">💫</div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="mb-8"
-        >
-          <Link
-            href="/projects"
-            className="inline-flex items-center text-pink-600 hover:text-purple-600 font-semibold transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Projects
-          </Link>
-        </motion.div>
-
-        <motion.article
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          className="card shadow-xl overflow-hidden"
-        >
-          <div className="relative h-64 md:h-80 bg-gradient-to-br from-pink-200 via-purple-200 to-indigo-200 overflow-hidden">
-            {hero ? (
-              <img src={hero} alt={project.title} className="absolute inset-0 w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-6xl opacity-50" aria-hidden>
-                  🎨
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="p-8 md:p-12">
-            <div className="flex flex-wrap items-center gap-4 mb-6">
-              {project.date ? (
-                <div className="flex items-center text-purple-600 text-sm font-medium">
-                  <Calendar className="w-4 h-4 mr-1" />
-                  {formatProjectDate(project.date)}
-                </div>
-              ) : null}
-
-              <div className="flex gap-3">
-                {project.github_url ? (
-                  <a
-                    href={project.github_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-white/70 hover:bg-white rounded-lg border border-pink-200 text-gray-800 font-semibold transition-colors"
-                  >
-                    <GithubIcon className="w-4 h-4" />
-                    Code
-                  </a>
-                ) : null}
-                {project.live_url ? (
-                  <a
-                    href={project.live_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg font-semibold hover:scale-105 transition-transform"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Live
-                  </a>
-                ) : null}
-              </div>
-            </div>
-
-            <h1
-              className="text-4xl md:text-5xl font-bold gradient-text mb-4"
-              style={{ fontFamily: 'Playfair Display, serif' }}
-            >
-              {project.title}
-            </h1>
-
-            <p className="text-xl text-gray-700 mb-8 font-medium leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              {project.description}
-            </p>
-
-            {Array.isArray(project.technologies) && project.technologies.length > 0 ? (
-              <div className="flex flex-wrap gap-2 mb-10">
-                {project.technologies.map((tech) => (
-                  <span key={tech} className="tech-tag">
-                    {tech}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
-            {/* Gallery first */}
-            {gallery.length > 0 ? (
-              <div className="mb-12">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  Gallery
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {gallery.map((src, idx) => {
-                    const resolved = resolveMediaUrl(src)
-                    return (
-                      <div
-                        key={`${src}-${idx}`}
-                        className="relative rounded-2xl overflow-hidden border border-pink-100 bg-white/60"
-                      >
-                        {resolved ? (
-                          <img
-                            src={resolved}
-                            alt={`${project.title} screenshot ${idx + 1}`}
-                            className="w-full h-56 object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="h-56 flex items-center justify-center text-gray-500">
-                            <ImageIcon className="w-6 h-6 mr-2" />
-                            Image
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Then long-form description (markdown) */}
-            {project.content ? (
-              <div className="text-gray-800 leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  Project Description
-                </h2>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({ children }) => (
-                      <h1 className="text-3xl font-bold text-gray-900 mb-6 mt-8" style={{ fontFamily: 'Playfair Display, serif' }}>
-                        {children}
-                      </h1>
-                    ),
-                    h2: ({ children }) => (
-                      <h2 className="text-2xl font-semibold text-gray-800 mb-4 mt-7" style={{ fontFamily: 'Playfair Display, serif' }}>
-                        {children}
-                      </h2>
-                    ),
-                    h3: ({ children }) => (
-                      <h3 className="text-xl font-semibold text-gray-800 mb-3 mt-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-                        {children}
-                      </h3>
-                    ),
-                    p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
-                    ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2">{children}</ol>,
-                    li: ({ children }) => <li className="ml-4">{children}</li>,
-                    blockquote: ({ children }) => (
-                      <blockquote className="border-l-4 border-pink-300 pl-4 italic text-gray-700 mb-4 bg-pink-50 py-2 rounded-r-lg">
-                        {children}
-                      </blockquote>
-                    ),
-                    code: ({ children, className }) => {
-                      const isBlock = typeof className === 'string' && className.includes('language-')
-                      if (isBlock) return <code className="text-sm font-mono">{children}</code>
-                      return (
-                        <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono text-pink-600">
-                          {children}
-                        </code>
-                      )
-                    },
-                    pre: ({ children }) => (
-                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto mb-6 border border-gray-800">
-                        {children}
-                      </pre>
-                    ),
-                    img: ({ src, alt }) => {
-                      const resolved = src ? resolveMediaUrl(String(src)) : ''
-                      if (!resolved) return null
-                      return (
-                        <img
-                          src={resolved}
-                          alt={alt ?? ''}
-                          className="rounded-xl max-w-full h-auto my-6 shadow-md border border-pink-100"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      )
-                    },
-                    a: ({ href, children }) => (
-                      <a href={href} className="text-pink-600 hover:text-purple-600 underline font-medium">
-                        {children}
-                      </a>
-                    ),
-                    strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                    em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
-                  }}
-                >
-                  {project.content}
-                </ReactMarkdown>
-              </div>
-            ) : null}
-
-            {/* Then inspiration (markdown) */}
-            {project.inspiration ? (
-              <div className="mt-12">
-                <h2 className="text-2xl font-semibold text-gray-800 mb-3" style={{ fontFamily: 'Playfair Display, serif' }}>
-                  Inspiration
-                </h2>
-                <div className="text-gray-800 leading-relaxed" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => <p className="mb-4 leading-relaxed">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-2">{children}</ol>,
-                      li: ({ children }) => <li className="ml-4">{children}</li>,
-                      a: ({ href, children }) => (
-                        <a href={href} className="text-pink-600 hover:text-purple-600 underline font-medium">
-                          {children}
-                        </a>
-                      ),
-                      strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                      em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
-                    }}
-                  >
-                    {project.inspiration}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </motion.article>
-      </div>
-    </div>
+    <section id={id} className="sv" style={{ ...COLUMN, scrollMarginTop: 100, ...style }}>
+      {title && <h2 className="serif" style={H2}>{title}</h2>}
+      {children}
+    </section>
   )
 }
 
+function Hero({ project }: { project: Project }) {
+  const technologies = Array.isArray(project.technologies) ? project.technologies : []
+  const meta = [
+    { label: 'Role', value: project.role },
+    { label: 'Stack', value: technologies.join(', ') },
+    { label: 'Platform', value: project.platform },
+    { label: 'Timeline', value: formatMonthYear(project.date, true) },
+  ].filter((m) => typeof m.value === 'string' && m.value.trim())
+  const image = resolveMediaUrl(project.image)
+
+  return (
+    <section
+      id={CASE_STUDY_HERO_ID}
+      style={{ position: 'relative', overflow: 'clip', background: 'linear-gradient(160deg, #160f3a 0%, #2a1a5e 55%, #4b2a8a 100%)', color: '#fff', paddingBottom: image ? 0 : 96 }}
+    >
+      <Spark className="twinkle" style={twinkle({ position: 'absolute', left: '8%', top: '18%', width: 22, height: 22, color: '#8fd8ff' }, '.1s')} />
+      <Spark className="twinkle" style={twinkle({ position: 'absolute', right: '9%', top: '12%', width: 30, height: 30, color: '#ff9ad1' }, '1.1s')} />
+      <Spark className="twinkle" style={twinkle({ position: 'absolute', right: '30%', top: '36%', width: 16, height: 16, color: '#fff' }, '1.9s')} />
+      <div className="wrap" style={{ paddingTop: 88, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+        <Link href="/projects" className="in" style={{ fontSize: 'var(--t-meta)', fontWeight: 600, color: '#e6dcff', textDecoration: 'none' }}>
+          ← All projects
+        </Link>
+        <p className="in" style={{ ...delay(80), fontSize: 'var(--t-meta)', fontWeight: 600, color: '#f5d0fe' }}>Case study</p>
+        <h1 className="serif in" style={{ ...delay(150), fontSize: 'clamp(56px, 8vw, 120px)', lineHeight: 1 }}>{project.title}</h1>
+        {project.description && (
+          <p className="in" style={{ ...delay(250), fontSize: 'var(--t-lead)', lineHeight: 1.6, maxWidth: '46ch', color: '#e6dcff' }}>{project.description}</p>
+        )}
+        {meta.length > 0 && (
+          <dl className="in cs-meta" style={{ ...delay(350), width: '100%', maxWidth: 900, marginTop: 24, textAlign: 'left' }}>
+            {meta.map((m) => (
+              <div key={m.label}>
+                <dt style={{ fontSize: 'var(--t-sm)', color: '#c4b5fd' }}>{m.label}</dt>
+                <dd style={{ fontWeight: 600, marginTop: 4 }}>{m.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+      {image && (
+        <div className="wrap cs-parallax" style={{ maxWidth: 1060, marginTop: 64, marginBottom: -120, position: 'relative', zIndex: 2 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt={project.title} style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 24, boxShadow: '0 50px 100px -40px #000' }} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function Toc({ items }: { items: { id: string; label: string }[] }) {
+  if (!items.length) return <div className="cs-toc" aria-hidden="true" />
+  return (
+    <nav className="cs-toc" aria-label="On this page">
+      <p style={{ fontSize: 'var(--t-sm)', fontWeight: 600, color: '#6b5a7e', padding: '0 14px 8px' }}>On this page</p>
+      {items.map((item) => (
+        <a key={item.id} className="cs-tocl" href={`#${item.id}`}>
+          {item.label}
+        </a>
+      ))}
+    </nav>
+  )
+}
+
+function StructuredBody({ project }: { project: Project }) {
+  const cs = normaliseCaseStudy(project.case_study)!
+  const toc = caseStudyToc(cs)
+  const has = new Set(toc.map((t) => t.id))
+  const steps = cs.architecture.steps
+  const archColumns = steps.flatMap((_, i) => (i === 0 ? ['minmax(0,1fr)'] : ['60px', 'minmax(0,1fr)'])).join(' ')
+
+  return (
+    <>
+      <Toc items={toc} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 110, minWidth: 0 }}>
+        {has.has('overview') && (
+          <Section id="overview" title="Overview" style={{ gap: 20 }}>
+            <Markdown variant="lead">{cs.overview}</Markdown>
+          </Section>
+        )}
+        {has.has('problem') && (
+          <section id="problem" className={cs.howMightWe && cs.problem ? 'sv cs-two' : 'sv'} style={{ alignItems: 'center', scrollMarginTop: 100 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <h2 className="serif" style={H2}>The problem</h2>
+              <Markdown>{cs.problem}</Markdown>
+            </div>
+            {cs.howMightWe && (
+              <blockquote style={{ margin: 0, padding: 32, borderRadius: 28, background: 'linear-gradient(135deg, #fdf2fb, #f1e8ff)', position: 'relative' }}>
+                <Spark style={{ position: 'absolute', right: 22, top: -14, width: 30, height: 30, color: 'var(--c1)' }} />
+                <p className="serif" style={{ fontSize: 28, lineHeight: 1.35, color: '#4c1d95' }}>{cs.howMightWe}</p>
+              </blockquote>
+            )}
+          </section>
+        )}
+        {has.has('process') && (
+          <Section id="process" title="Process">
+            <ProcessTabs phases={cs.process} />
+          </Section>
+        )}
+        {has.has('architecture') && (
+          <Section id="architecture" title="Architecture">
+            <Markdown>{cs.architecture.summary}</Markdown>
+            {steps.length > 0 && (
+              <div className="cs-arch" style={{ gridTemplateColumns: archColumns, background: 'linear-gradient(135deg, #160f3a, #4b2a8a)', borderRadius: 32, padding: 'clamp(24px, 4vw, 48px)', color: '#2d3436' }}>
+                {steps.map((step, i) => (
+                  <Fragment key={`${step.title}-${i}`}>
+                    {i > 0 && (
+                      <div className="cs-arrow cs-flow" aria-hidden="true" style={{ height: 4, margin: '0 10px', borderRadius: 4, background: 'repeating-linear-gradient(90deg, #f472b6 0 12px, transparent 12px 24px)' }} />
+                    )}
+                    <div className="cs-box">
+                      <p style={{ color: 'var(--b2)' }}>{step.title}</p>
+                      {step.detail && <p style={{ fontSize: 'var(--t-sm)', fontWeight: 400, marginTop: 6 }}>{step.detail}</p>}
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
+        {has.has('features') && (
+          <Section id="features" title="Key features">
+            <div className="cs-three">
+              {cs.features.map((f, i) => {
+                const image = resolveMediaUrl(f.image)
+                return (
+                  <div key={`${f.title}-${i}`} style={{ background: '#fff', borderRadius: 24, padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {image && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={image} alt={f.imageAlt} loading="lazy" style={{ width: '100%', aspectRatio: '16 / 10', objectFit: 'cover', borderRadius: 24, display: 'block' }} />
+                    )}
+                    <h3 style={{ fontSize: 18, fontWeight: 600 }}>{f.title}</h3>
+                    <div style={{ fontSize: 'var(--t-meta)' }}>
+                      <Markdown>{f.body}</Markdown>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Section>
+        )}
+        {has.has('challenges') && (
+          <Section id="challenges" title="Challenges">
+            <div className="cs-two">
+              {cs.challenges.map((c, i) => (
+                <div key={`${c.title}-${i}`} style={{ background: '#fff', borderRadius: 24, padding: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <p style={{ fontSize: 'var(--t-sm)', fontWeight: 600, color: '#c2185b' }}>Challenge</p>
+                  <h3 style={{ fontSize: 20, fontWeight: 600 }}>{c.title}</h3>
+                  {c.solution && (
+                    <div className="cs-solution" style={{ fontSize: 'var(--t-meta)', lineHeight: 1.65 }}>
+                      <strong style={{ color: 'var(--b2)' }}>Solution:</strong> <Markdown>{c.solution}</Markdown>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+        {has.has('outcome') && (
+          <Section id="outcome" title="Outcome">
+            {cs.metrics.length > 0 && (
+              <div className="cs-three">
+                {cs.metrics.map((m, i) => (
+                  <div key={`${m.value}-${i}`} className="cs-metric" style={{ background: 'linear-gradient(135deg, #fdf2fb, #f1e8ff)', borderRadius: 24, padding: 28 }}>
+                    <p className="serif" style={{ fontSize: 44, color: 'var(--b2)' }}>{m.value}</p>
+                    <p style={{ fontSize: 'var(--t-meta)' }}>{m.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {cs.learned && (
+              <div style={{ background: '#fff', borderRadius: 28, padding: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <h3 className="script" style={{ fontSize: 40, color: 'var(--b2)' }}>What I learned</h3>
+                <Markdown>{cs.learned}</Markdown>
+              </div>
+            )}
+          </Section>
+        )}
+        <Extras project={project} />
+      </div>
+    </>
+  )
+}
+
+/** Unconverted projects: the legacy Markdown `content` in the same styles. */
+function LegacyBody({ project }: { project: Project }) {
+  const content = typeof project.content === 'string' ? project.content : ''
+  return (
+    <>
+      <Toc items={extractToc(content)} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 64, minWidth: 0 }}>
+        {content ? <Markdown>{content}</Markdown> : <p style={{ fontSize: 'var(--t-lead)' }}>The full write-up is on its way.</p>}
+        <Extras project={project} />
+      </div>
+    </>
+  )
+}
+
+function Extras({ project }: { project: Project }) {
+  const gallery = (Array.isArray(project.images) ? project.images : []).map(resolveMediaUrl).filter(Boolean)
+  return (
+    <>
+      {gallery.length > 0 && (
+        <section id="gallery" className="sv" style={COLUMN} aria-labelledby="gallery-title">
+          <h2 id="gallery-title" className="serif" style={H2}>Gallery</h2>
+          <div className="cs-three">
+            {gallery.map((src, i) => (
+              <div key={src} style={{ background: '#fff', borderRadius: 24, padding: 16 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`${project.title} screenshot ${i + 1}`} loading="lazy" style={{ width: '100%', aspectRatio: '16 / 10', objectFit: 'cover', borderRadius: 18, display: 'block' }} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {(project.github_url || project.live_url) && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {project.live_url && <Button href={project.live_url}>See it live</Button>}
+          {project.github_url && (
+            <Button href={project.github_url} variant="line">
+              View on GitHub
+            </Button>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+export default function ProjectDetailsClient({ project, next }: { project: Project; next?: Project | null }) {
+  const structured = normaliseCaseStudy(project.case_study) !== null
+  const nextImage = next ? resolveMediaUrl(next.image) : ''
+  return (
+    <div className="cs">
+      <Hero project={project} />
+      <div className="wrap cs-body" style={{ paddingTop: project.image ? 200 : 96, paddingBottom: 100 }}>
+        {structured ? <StructuredBody project={project} /> : <LegacyBody project={project} />}
+      </div>
+      {next && (
+        <Link href={`/projects/${next.slug}`} style={{ display: 'block', textDecoration: 'none', background: 'linear-gradient(135deg, #1b1840, #3b2a7a)', color: '#fff' }}>
+          <div className="wrap" style={{ paddingTop: 90, paddingBottom: 90, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 32, flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: 'var(--t-meta)', color: '#c4b5fd' }}>Next project</p>
+              <p className="serif" style={{ fontSize: 'clamp(44px, 6vw, 88px)', lineHeight: 1.05 }}>{next.title}</p>
+            </div>
+            {nextImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={nextImage} alt="" loading="lazy" style={{ width: 200, height: 'auto' }} />
+            )}
+          </div>
+        </Link>
+      )}
+    </div>
+  )
+}

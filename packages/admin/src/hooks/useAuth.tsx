@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
-import { api } from '@/lib/api'
+import { api, setUnauthorizedHandler } from '@/lib/api'
 
 interface User {
   id: string
@@ -52,6 +52,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchUser()
+  }, [])
+
+  // A 401 on any admin call (expired or invalid token) signs out in place, without a reload.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      delete api.defaults.headers.common['Authorization']
+      setUser(null)
+    })
+    return () => setUnauthorizedHandler(null)
   }, [])
 
   const login = async (email: string, password: string) => {

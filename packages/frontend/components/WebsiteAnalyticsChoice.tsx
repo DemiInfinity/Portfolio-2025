@@ -1,23 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { isAnalyticsOptedOut, setAnalyticsOptOut } from '@/lib/analytics'
 
+const noop = () => () => {}
+
 export default function WebsiteAnalyticsChoice() {
-  const [optedOut, setOptedOut] = useState(false)
-  const [ready, setReady] = useState(false)
+  // null on the server and the first client render, then the stored choice.
+  const stored = useSyncExternalStore(noop, isAnalyticsOptedOut, () => null)
+  const [changed, setChanged] = useState<boolean | null>(null)
+  const optedOut = changed ?? stored
+  const setOptedOut = setChanged
 
-  useEffect(() => {
-    setOptedOut(isAnalyticsOptedOut())
-    setReady(true)
-  }, [])
-
-  if (!ready) {
+  if (optedOut === null) {
     return <p>Checking your analytics preference…</p>
   }
 
   return (
-    <div className="mb-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'flex-start' }}>
       <p>
         {optedOut
           ? 'Site analytics are off in this browser. We will not send new page-visit records from this device unless you turn them back on.'
@@ -25,7 +25,7 @@ export default function WebsiteAnalyticsChoice() {
       </p>
       <button
         type="button"
-        className="btn-secondary text-sm px-4 py-2 mt-2"
+        className="btn btn-soft btn-sm"
         onClick={() => {
           const next = !optedOut
           setAnalyticsOptOut(next)

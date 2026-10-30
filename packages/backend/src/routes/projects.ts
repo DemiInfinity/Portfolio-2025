@@ -1,419 +1,314 @@
 import express from 'express'
-import { body, validationResult } from 'express-validator'
+import { body } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { toStringArray, parseListInput } from '../utils/lists'
+import { rejectInvalid, sendInvalid, optionalText, FieldError } from '../utils/validation'
+import { insertRow, updateRow, selectById, selectRows, Row } from '../utils/db'
+import { normaliseCaseStudy, readCaseStudy, hasCaseStudy, featureTitles } from '../utils/caseStudy'
+import { markCvDirty } from '../services/cvDirty'
 
 const router = express.Router()
 
-const ALLOWED_STATUSES = new Set(['in_development', 'ideas', 'completed'])
+export const PROJECT_STATUSES = ['in_development', 'ideas', 'completed']
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
-function generateSlug(title: string) {
+// Column lists: current schema, then before the v2 migration (no case_study,
+// show_on_site), then before the round-1 migration (no role, platform).
+const BASE = 'id, title, slug, description, image, images, technologies, github_url, live_url, featured, date, status, inspiration, created_at, updated_at'
+const V1 = `${BASE}, role, platform`
+const LIST_COLUMNS = `${V1}, show_on_site, case_study`
+const LIST_LEGACY = [V1, BASE]
+const FULL_COLUMNS = `${LIST_COLUMNS}, content`
+const FULL_LEGACY = [`${V1}, content`, `${BASE}, content`]
+const NEW_COLUMNS = ['role', 'platform', 'case_study', 'show_on_site']
+
+export function generateSlug(title: string) {
   return String(title || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')
 }
 
-// Get all projects (public)
-router.get('/', async (req: Request, res: Response) => {
+/** H-19: public when shown on site and not an idea. Pre-migration rows count as shown. */
+export function isPublicProject(p: Row): boolean {
+  return p.show_on_site !== false && p.status !== 'ideas'
+}
+
+function baseFormat(p: Row) {
+  return {
+    ...p,
+    technologies: toStringArray(p.technologies),
+    images: toStringArray(p.images, null),
+    featured: Boolean(p.featured),
+    role: p.role ?? null,
+    platform: p.platform ?? null,
+    show_on_site: p.show_on_site !== false
+  }
+}
+
+/** List rows: no `content` or `case_study`; adds `has_case_study` and `feature_titles` (H-18, H-22). */
+export function formatListProject(p: Row) {
+  const cs = readCaseStudy(p.case_study)
+  const out: Row = { ...baseFormat(p), has_case_study: hasCaseStudy(cs), feature_titles: featureTitles(cs) }
+  delete out.case_study
+  delete out.content
+  return out
+}
+
+/** Single reads: everything, `case_study` null when unset. */
+export function formatFullProject(p: Row) {
+  return { ...baseFormat(p), case_study: readCaseStudy(p.case_study), content: p.content ?? null }
+}
+
+/** Featured first, then newest. */
+function sortProjects(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => {
+    if (a.featured && !b.featured) return -1
+    if (!a.featured && b.featured) return 1
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+}
+
+const listAll = async () => sortProjects(await selectRows('projects', LIST_COLUMNS, LIST_LEGACY))
+
+// ---------- validation ----------
+
+const looseUrl = (value: unknown) => {
+  if (value === null || value === '' || value === undefined) return true
+  return typeof value === 'string' && (/^https?:\/\/.+/.test(value) || /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(value))
+}
+
+const textField = (name: string, max: number) =>
+  body(name)
+    .optional({ nullable: true })
+    .custom((v) => typeof v === 'string')
+    .withMessage(`${name} must be text`)
+    .bail()
+    .isLength({ max })
+    .withMessage(`${name} is at most ${max} characters`)
+
+const validators = (isCreate: boolean) => [
+  isCreate
+    ? body('title').isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title is required')
+    : body('title').optional().isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title cannot be empty'),
+  textField('description', 5000),
+  textField('content', 200000),
+  textField('inspiration', 5000),
+  body('slug').optional({ nullable: true }).custom((v) => typeof v === 'string').withMessage('Invalid slug'),
+  body('status').optional().isIn(PROJECT_STATUSES).withMessage(`Status is one of ${PROJECT_STATUSES.join(', ')}`),
+  body('technologies').optional({ nullable: true }).custom((v) => parseListInput(v, ',') !== null).withMessage('Technologies must be a list'),
+  body('images').optional({ nullable: true }).custom((v) => parseListInput(v, '\n') !== null).withMessage('Images must be a list'),
+  body('image').optional({ nullable: true }).custom((v) => v === '' || typeof v === 'string').withMessage('Image must be a URL'),
+  body('image_url').optional({ nullable: true }).custom(looseUrl).withMessage('Image must be a URL'),
+  body('github_url').optional({ nullable: true }).custom(looseUrl).withMessage('GitHub URL must be a URL'),
+  body('live_url').optional({ nullable: true }).custom(looseUrl).withMessage('Live URL must be a URL'),
+  body('featured').optional().custom((v) => typeof v === 'boolean').withMessage('Featured is true or false'),
+  body('show_on_site').optional().custom((v) => typeof v === 'boolean').withMessage('Show on site is true or false'),
+  body('date').optional({ nullable: true }).custom((v) => typeof v === 'string').withMessage('Date must be text'),
+  textField('role', 120),
+  textField('platform', 120)
+]
+
+/** Validates slug and case_study (beyond express-validator) and builds the DB payload. */
+function toPayload(input: Row): { payload: Row; errors: FieldError[] } {
+  const errors: FieldError[] = []
+  const out: Row = {}
+  if ('title' in input) out.title = String(input.title).trim()
+  if ('description' in input) out.description = input.description == null ? '' : String(input.description).trim()
+  if ('content' in input) out.content = input.content ?? null
+  if ('inspiration' in input) out.inspiration = input.inspiration ?? null
+  if ('status' in input) out.status = input.status
+  if ('technologies' in input) out.technologies = parseListInput(input.technologies, ',') || []
+  if ('images' in input) out.images = parseListInput(input.images, '\n') || []
+  if ('image_url' in input) out.image = optionalText(input.image_url)
+  if ('image' in input) out.image = optionalText(input.image)
+  if ('github_url' in input) out.github_url = optionalText(input.github_url)
+  if ('live_url' in input) out.live_url = optionalText(input.live_url)
+  if ('featured' in input) out.featured = input.featured === true
+  if ('show_on_site' in input) out.show_on_site = input.show_on_site === true
+  if ('date' in input) out.date = optionalText(input.date)
+  if ('role' in input) out.role = optionalText(input.role)
+  if ('platform' in input) out.platform = optionalText(input.platform)
+  if ('case_study' in input) {
+    const cs = normaliseCaseStudy(input.case_study)
+    errors.push(...cs.errors)
+    out.case_study = cs.value
+  }
+  return { payload: out, errors }
+}
+
+async function slugTaken(slug: string, exceptId?: string): Promise<boolean> {
+  let q = getServices().supabaseService.getClient().from('projects').select('id').eq('slug', slug)
+  if (exceptId) q = q.neq('id', exceptId)
+  const { data, error } = await q.limit(1)
+  if (error) throw error
+  return Array.isArray(data) && data.length > 0
+}
+
+/** H-4: one spotlight. Clears `featured` on every other project; returns their ids. */
+async function clearOtherFeatured(id: number | string): Promise<number[]> {
+  const { data, error } = await getServices().supabaseService.getClient()
+    .from('projects')
+    .update({ featured: false, updated_at: new Date().toISOString() })
+    .neq('id', id)
+    .eq('featured', true)
+    .select('id')
+  if (error) throw error
+  return (data || []).map((r: Row) => Number(r.id))
+}
+
+// ---------- public reads ----------
+
+// Public projects only (H-19), featured first then newest.
+router.get('/', async (_req: Request, res: Response) => {
   try {
-    const { supabaseService } = getServices()
-    const projects = await supabaseService.select(
-      'projects', 
-      'id, title, slug, description, image, technologies, github_url, live_url, featured, date, created_at, updated_at, inspiration, images, status'
-    )
-
-    // Sort by featured first, then by created_at desc
-    projects.sort((a, b) => {
-      if (a.featured && !b.featured) return -1
-      if (!a.featured && b.featured) return 1
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
-
-    // Parse technologies from JSON string to array
-    const parsedProjects = projects.map((project: any) => ({
-      ...project,
-      technologies: (() => {
-        try {
-          if (typeof project.technologies === 'string') {
-            if (project.technologies.startsWith('[')) {
-              return JSON.parse(project.technologies)
-            }
-            // Handle comma-separated string
-            return project.technologies.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
-          }
-          return Array.isArray(project.technologies) ? project.technologies : []
-        } catch {
-          return []
-        }
-      })(),
-      images: (() => {
-        try {
-          if (project.images == null) return []
-          if (typeof project.images === 'string') return JSON.parse(project.images)
-          return Array.isArray(project.images) ? project.images : []
-        } catch {
-          return []
-        }
-      })(),
-      featured: Boolean(project.featured)
-    }))
-
-    res.json({
-      success: true,
-      data: parsedProjects
-    })
+    const rows = (await listAll()).filter(isPublicProject)
+    return res.json({ success: true, data: rows.map(formatListProject) })
   } catch (error) {
     console.error('Error fetching projects:', error)
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch projects'
-    })
+    return res.status(500).json({ success: false, error: 'Failed to fetch projects' })
   }
 })
 
-// Get single project by slug (public)
+// ---------- admin reads (registered before /:id) ----------
+
+router.get('/admin/all', [authenticate, authorize('admin')], async (_req: AuthRequest, res: Response) => {
+  try {
+    const rows = await listAll()
+    return res.json({ success: true, data: rows.map(formatListProject) })
+  } catch (error) {
+    console.error('Admin list projects error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+router.get('/admin/:id', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
+  try {
+    const project = await selectById('projects', String(req.params.id), FULL_COLUMNS, FULL_LEGACY)
+    if (!project) return res.status(404).json({ success: false, error: 'Project not found' })
+    return res.json({ success: true, data: formatFullProject(project) })
+  } catch (error) {
+    console.error('Admin get project error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Single public project by slug (404 when hidden)
 router.get('/slug/:slug', async (req: Request, res: Response) => {
   try {
-    const { slug } = req.params
+    const slug = String(req.params.slug)
     if (!slug || !SLUG_RE.test(slug)) {
       return res.status(400).json({ success: false, error: 'Invalid slug' })
     }
-
-    const { supabaseService } = getServices()
-    const { data: project, error } = await supabaseService.getClient()
-      .from('projects')
-      .select('id, title, slug, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status')
-      .eq('slug', slug)
-      .single()
-
-    if (error || !project) {
+    const rows = await selectRows('projects', FULL_COLUMNS, FULL_LEGACY, (q) => q.eq('slug', slug).limit(1))
+    const project = rows[0]
+    if (!project || !isPublicProject(project)) {
       return res.status(404).json({ success: false, error: 'Project not found' })
     }
-
-    const parsedProject = {
-      ...project,
-      technologies: typeof (project as any).technologies === 'string'
-        ? (((project as any).technologies as string).startsWith('[') ? JSON.parse((project as any).technologies) : ((project as any).technologies as string).split(',').map((t: string) => t.trim()))
-        : (project as any).technologies || [],
-      images: (() => {
-        try {
-          if ((project as any).images == null) return []
-          if (typeof (project as any).images === 'string') return JSON.parse((project as any).images)
-          return Array.isArray((project as any).images) ? (project as any).images : []
-        } catch {
-          return []
-        }
-      })(),
-      featured: Boolean((project as any).featured)
-    }
-
-    return res.json({ success: true, data: parsedProject })
+    return res.json({ success: true, data: formatFullProject(project) })
   } catch (error) {
     console.error('Get project by slug error:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get single project by ID (public)
+// Single public project by id (404 when hidden)
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { supabaseService } = getServices()
-    
-    const project = await supabaseService.selectOne(
-      'projects', 
-      id, 
-      'id, title, slug, description, content, inspiration, images, image, technologies, github_url, live_url, featured, date, created_at, updated_at, status'
-    )
-
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        error: 'Project not found'
-      })
+    const project = await selectById('projects', String(req.params.id), FULL_COLUMNS, FULL_LEGACY)
+    if (!project || !isPublicProject(project)) {
+      return res.status(404).json({ success: false, error: 'Project not found' })
     }
-
-    const parsedProject = {
-      ...project,
-      technologies: typeof project.technologies === 'string' 
-        ? (project.technologies.startsWith('[') ? JSON.parse(project.technologies) : project.technologies.split(',').map((t: string) => t.trim()))
-        : project.technologies || [],
-      images: (() => {
-        try {
-          if (project.images == null) return []
-          if (typeof project.images === 'string') return JSON.parse(project.images)
-          return Array.isArray(project.images) ? project.images : []
-        } catch {
-          return []
-        }
-      })(),
-      featured: Boolean(project.featured)
-    }
-
-    return res.json({
-      success: true,
-      data: parsedProject
-    })
+    return res.json({ success: true, data: formatFullProject(project) })
   } catch (error) {
     console.error('Get project error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Create project (admin only)
-router.post('/', authenticate, authorize('admin'), [
-  body('title').notEmpty().withMessage('Title is required'),
-  body('description').notEmpty().withMessage('Description is required'),
-  body('content').optional().isString(),
-  body('inspiration').optional().isString(),
-  body('images').optional().isArray(),
-  body('status').optional().isIn(Array.from(ALLOWED_STATUSES)),
-  body('slug').optional().isString().trim()
-], async (req: AuthRequest, res: Response) => {
+// ---------- writes ----------
+
+router.post('/', [authenticate, authorize('admin'), ...validators(true)], async (req: AuthRequest, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      })
-    }
+    if (rejectInvalid(req, res)) return
+    const { payload, errors } = toPayload(req.body)
+    if (errors.length) return sendInvalid(res, errors)
 
-    const { title, description, content, inspiration, images, status, slug, technologies, github_url, live_url, image, featured, date } = req.body
-    const { supabaseService } = getServices()
-
-    // Determine slug (validate or generate) and ensure uniqueness
-    const baseSlug = slug && typeof slug === 'string' && slug.trim() ? slug.trim() : generateSlug(title)
+    const requested = typeof req.body.slug === 'string' ? req.body.slug.trim() : ''
+    const baseSlug = requested || generateSlug(payload.title)
     if (!baseSlug || !SLUG_RE.test(baseSlug)) {
-      return res.status(400).json({ success: false, error: 'Invalid slug' })
+      return res.status(400).json({ success: false, error: 'Invalid slug', details: [{ path: 'slug', msg: 'Invalid slug' }] })
     }
+    let slug = baseSlug
+    for (let n = 1; await slugTaken(slug); n++) slug = `${baseSlug}-${n}`
 
-    let uniqueSlug = baseSlug
-    let counter = 1
-    while (true) {
-      const { data: existing, error: existsError } = await supabaseService.getClient()
-        .from('projects')
-        .select('id')
-        .eq('slug', uniqueSlug)
-        .maybeSingle()
-      if (existsError) throw existsError
-      if (!existing) break
-      uniqueSlug = `${baseSlug}-${counter}`
-      counter++
-    }
+    const created = await insertRow(
+      'projects',
+      {
+        description: '',
+        content: null,
+        inspiration: null,
+        images: [],
+        technologies: [],
+        status: 'in_development',
+        featured: false,
+        show_on_site: true,
+        ...payload,
+        slug
+      },
+      NEW_COLUMNS
+    )
 
-    const newProject = await supabaseService.insert('projects', {
-      title,
-      slug: uniqueSlug,
-      description,
-      content,
-      inspiration,
-      images: images || [],
-      status: status || 'in_development',
-      technologies: technologies || [],
-      github_url,
-      live_url,
-      image,
-      featured: featured || false,
-      date
-    })
-
-    return res.status(201).json({
-      success: true,
-      data: {
-        ...newProject,
-        technologies: typeof newProject.technologies === 'string' 
-          ? (newProject.technologies.startsWith('[') ? JSON.parse(newProject.technologies) : newProject.technologies.split(',').map((t: string) => t.trim()))
-          : newProject.technologies || [],
-        images: (() => {
-          try {
-            if (newProject.images == null) return []
-            if (typeof newProject.images === 'string') return JSON.parse(newProject.images)
-            return Array.isArray(newProject.images) ? newProject.images : []
-          } catch {
-            return []
-          }
-        })(),
-        featured: Boolean(newProject.featured)
-      }
-    })
+    const unfeatured = created.featured ? await clearOtherFeatured(created.id) : []
+    await markCvDirty()
+    return res.status(201).json({ success: true, data: { ...formatFullProject(created), unfeatured } })
   } catch (error) {
     console.error('Create project error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Update project (admin only)
-router.put('/:id', [
-  authenticate,
-  authorize('admin'),
-  body('title').optional().isLength({ min: 1 }).trim(),
-  body('slug').optional().isString().trim(),
-  body('description').optional().isLength({ min: 1 }).trim(),
-  body('content').optional().isString(),
-  body('inspiration').optional().isString(),
-  body('images').optional().isArray(),
-  body('status').optional().isIn(Array.from(ALLOWED_STATUSES)),
-  body('image').optional().custom((value) => {
-    if (value === null || value === '' || value === undefined) return true
-    return typeof value === 'string'
-  }),
-  body('image_url').optional().custom((value) => {
-    if (value === null || value === '' || value === undefined) return true
-    return /^https?:\/\/.+/.test(value) || /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(value)
-  }),
-  body('technologies').optional().isArray({ min: 1 }),
-  body('github_url').optional().custom((value) => {
-    if (value === null || value === '') return true
-    return /^https?:\/\/.+/.test(value) || /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(value)
-  }),
-  body('live_url').optional().custom((value) => {
-    if (value === null || value === '') return true
-    return /^https?:\/\/.+/.test(value) || /^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(value)
-  }),
-  body('featured').optional().isBoolean(),
-  body('date').optional().isString()
-], async (req: AuthRequest, res: Response) => {
+router.put('/:id', [authenticate, authorize('admin'), ...validators(false)], async (req: AuthRequest, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      console.error('Project update validation errors:', errors.array())
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
+    if (rejectInvalid(req, res)) return
+    const id = String(req.params.id)
+    const { payload, errors } = toPayload(req.body)
+    if (errors.length) return sendInvalid(res, errors)
+
+    if ('slug' in req.body) {
+      const slug = String(req.body.slug ?? '').trim()
+      if (!SLUG_RE.test(slug)) {
+        return res.status(400).json({ success: false, error: 'Invalid slug', details: [{ path: 'slug', msg: 'Invalid slug' }] })
+      }
+      if (await slugTaken(slug, id)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Slug already exists. Please choose a different slug.',
+          details: [{ path: 'slug', msg: 'Slug already exists' }]
+        })
+      }
+      payload.slug = slug
     }
 
-    const { id } = req.params
-    const updateData = req.body
-    const { supabaseService } = getServices()
+    payload.updated_at = new Date().toISOString()
+    const updated = await updateRow('projects', id, payload, NEW_COLUMNS)
+    if (!updated) return res.status(404).json({ success: false, error: 'Project not found' })
 
-    // Check if project exists
-    const existingProject = await supabaseService.getClient()
-      .from('projects')
-      .select('id, slug')
-      .eq('id', id)
-      .single()
-
-    if (!existingProject || existingProject.error) {
-      return res.status(404).json({
-        success: false,
-        error: 'Project not found'
-      })
-    }
-
-    // Prepare update payload
-    const updatePayload: any = {}
-    
-    Object.keys(updateData).forEach(key => {
-      // Skip id and undefined values
-      if (key === 'id' || updateData[key] === undefined) {
-        return
-      }
-      
-      if (key === 'technologies') {
-        // Ensure technologies is stored as JSON string
-        updatePayload[key] = JSON.stringify(updateData[key])
-      } else if (key === 'images') {
-        updatePayload.images = JSON.stringify(updateData[key])
-      } else if (key === 'slug') {
-        const requested = String(updateData[key] || '').trim()
-        if (!requested || !SLUG_RE.test(requested)) {
-          throw new Error('Invalid slug')
-        }
-        updatePayload.slug = requested
-      } else if (key === 'image_url') {
-        // Map image_url to image if provided (allow null/empty)
-        updatePayload.image = updateData[key] || null
-      } else if (key === 'image') {
-        // Handle image field - allow null/empty values
-        updatePayload.image = updateData[key] || null
-      } else {
-        // Include all other fields (allow null values for optional fields)
-        updatePayload[key] = updateData[key]
-      }
-    })
-
-    // Enforce slug uniqueness if being updated
-    if (updatePayload.slug && updatePayload.slug !== (existingProject.data as any)?.slug) {
-      const { data: slugHit, error: slugErr } = await supabaseService.getClient()
-        .from('projects')
-        .select('id')
-        .eq('slug', updatePayload.slug)
-        .neq('id', id)
-        .maybeSingle()
-      if (slugErr) throw slugErr
-      if (slugHit) {
-        return res.status(400).json({ success: false, error: 'Slug already exists. Please choose a different slug.' })
-      }
-    }
-
-    // Always update updated_at
-    updatePayload.updated_at = new Date().toISOString()
-
-    // Use Supabase client update method
-    const updatedProject = await supabaseService.update('projects', id, updatePayload)
-
-    return res.json({
-      success: true,
-      data: {
-        ...updatedProject,
-        technologies: (() => {
-          try {
-            if (updatedProject.technologies) {
-              if (typeof updatedProject.technologies === 'string') {
-                return JSON.parse(updatedProject.technologies)
-              }
-              return updatedProject.technologies
-            }
-            return []
-          } catch {
-            // If parsing fails, try to split by comma
-            if (typeof updatedProject.technologies === 'string') {
-              return updatedProject.technologies.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
-            }
-            return []
-          }
-        })(),
-        images: (() => {
-          try {
-            if (updatedProject.images == null) return []
-            if (typeof updatedProject.images === 'string') return JSON.parse(updatedProject.images)
-            return Array.isArray(updatedProject.images) ? updatedProject.images : []
-          } catch {
-            return []
-          }
-        })(),
-        featured: Boolean(updatedProject.featured)
-      }
-    })
+    const unfeatured = payload.featured === true ? await clearOtherFeatured(updated.id) : []
+    await markCvDirty()
+    return res.json({ success: true, data: { ...formatFullProject(updated), unfeatured } })
   } catch (error) {
     console.error('Update project error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Delete project (admin only)
 router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
-    const { supabaseService } = getServices()
-
-    // Check if project exists and delete it
-    const { data: deletedProject, error } = await supabaseService.getClient()
+    const id = String(req.params.id)
+    const { data: deletedProject, error } = await getServices().supabaseService.getClient()
       .from('projects')
       .delete()
       .eq('id', id)
@@ -421,22 +316,14 @@ router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthReques
       .single()
 
     if (error || !deletedProject) {
-      return res.status(404).json({
-        success: false,
-        error: 'Project not found'
-      })
+      return res.status(404).json({ success: false, error: 'Project not found' })
     }
 
-    return res.json({
-      success: true,
-      message: 'Project deleted successfully'
-    })
+    await markCvDirty()
+    return res.json({ success: true, message: 'Project deleted successfully' })
   } catch (error) {
     console.error('Delete project error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { authenticate, authorize } from '../auth'
+import { authenticate, authorize, AuthRequest, resolveRole, adminEmailAllowlist } from '../auth'
 import { getServices } from '../../services'
 
 // Mock services
@@ -66,7 +66,7 @@ describe('Auth Middleware', () => {
 
   describe('authorize', () => {
     it('should call next if user has required role', () => {
-      mockRequest.user = {
+      ;(mockRequest as AuthRequest).user = {
         id: '1',
         email: 'admin@example.com',
         role: 'admin',
@@ -82,7 +82,7 @@ describe('Auth Middleware', () => {
     })
 
     it('should return 403 if user does not have required role', () => {
-      mockRequest.user = {
+      ;(mockRequest as AuthRequest).user = {
         id: '1',
         email: 'user@example.com',
         role: 'user',
@@ -100,3 +100,42 @@ describe('Auth Middleware', () => {
   })
 })
 
+
+describe('resolveRole / ADMIN_EMAILS', () => {
+  const original = process.env.ADMIN_EMAILS
+  afterEach(() => {
+    if (original === undefined) delete process.env.ADMIN_EMAILS
+    else process.env.ADMIN_EMAILS = original
+  })
+
+  it('keeps the existing default when ADMIN_EMAILS is unset: no metadata means admin', () => {
+    delete process.env.ADMIN_EMAILS
+    expect(resolveRole({ id: '1', email: 'owner@x.com' })).toBe('admin')
+  })
+
+  it('prefers app_metadata.role over user_metadata.role', () => {
+    delete process.env.ADMIN_EMAILS
+    expect(
+      resolveRole({ id: '1', email: 'a@x.com', app_metadata: { role: 'viewer' }, user_metadata: { role: 'admin' } })
+    ).toBe('viewer')
+    expect(resolveRole({ id: '1', email: 'a@x.com', user_metadata: { role: 'viewer' } })).toBe('viewer')
+  })
+
+  it('makes anyone not on the allowlist a viewer, whatever their metadata says', () => {
+    process.env.ADMIN_EMAILS = 'a@x.com'
+    expect(resolveRole({ id: '2', email: 'b@x.com', user_metadata: { role: 'admin' } })).toBe('viewer')
+    expect(resolveRole({ id: '2', email: 'b@x.com', app_metadata: { role: 'admin' } })).toBe('viewer')
+    expect(resolveRole({ id: '3', email: '' })).toBe('viewer')
+  })
+
+  it('matches the allowlist case-insensitively and ignores spaces', () => {
+    process.env.ADMIN_EMAILS = ' Owner@Example.com , other@x.com '
+    expect(resolveRole({ id: '1', email: 'owner@example.COM' })).toBe('admin')
+    expect(adminEmailAllowlist()).toEqual(['owner@example.com', 'other@x.com'])
+  })
+
+  it('an empty ADMIN_EMAILS behaves as unset', () => {
+    process.env.ADMIN_EMAILS = ' , '
+    expect(resolveRole({ id: '1', email: 'owner@x.com' })).toBe('admin')
+  })
+})

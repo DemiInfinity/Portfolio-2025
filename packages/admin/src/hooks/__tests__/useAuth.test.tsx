@@ -13,7 +13,8 @@ vi.mock('@/lib/api', () => ({
     },
     get: vi.fn(),
     post: vi.fn()
-  }
+  },
+  setUnauthorizedHandler: vi.fn()
 }))
 
 // Mock localStorage

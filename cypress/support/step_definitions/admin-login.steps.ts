@@ -111,18 +111,19 @@ Then('I should be redirected to the admin dashboard', () => {
 })
 
 Then('I should see the admin navigation menu', () => {
-  cy.contains('Admin Panel', { timeout: 15000 }).should('be.visible')
-  cy.contains('Dashboard').should('be.visible')
+  cy.contains('h1', 'Dashboard', { timeout: 15000 }).should('be.visible')
+  cy.get('nav[aria-label="Admin"]').first().should('be.visible')
+  cy.get('button[aria-label="Sign out"]').should('be.visible')
 })
 
 Then('I should see an error message', () => {
   // login API was already awaited in "I click the login button"; do not wait again
-  cy.get('input[type="password"]', { timeout: 10000 }).should('be.visible')
-  cy.get('button[type="submit"]').should('be.visible')
+  cy.get('[role="alert"]', { timeout: 10000 }).should('contain.text', "That email and password don't match. Try again.")
+  cy.get('input[type="email"]').should('have.value', 'invalid@example.com')
 })
 
 Then('I should remain on the login page', () => {
-  cy.url().should('not.include', '/dashboard')
+  cy.contains('h1', 'Sign in').should('be.visible')
 })
 
 Given('I am logged in as admin', () => {
@@ -205,7 +206,7 @@ Given('I am logged in as admin', () => {
 })
 
 When('I click the logout button', () => {
-  cy.contains('button', /sign out/i, { timeout: 10000 }).first().click()
+  cy.get('button[aria-label="Sign out"]', { timeout: 10000 }).filter(':visible').first().click()
   cy.wait('@logoutApi', { timeout: 10000 })
 })
 
@@ -214,6 +215,7 @@ Then('I should be redirected to the login page', () => {
 })
 
 Then('I should not see the admin dashboard', () => {
-  cy.get('[data-testid="dashboard"], .dashboard').should('not.exist')
+  cy.contains('h1', 'Sign in').should('be.visible')
+  cy.contains('h1', 'Dashboard').should('not.exist')
 })
 

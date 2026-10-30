@@ -1,16 +1,39 @@
-import express from 'express'
-import { body, validationResult } from 'express-validator'
+import express, { NextFunction } from 'express'
+import { body, query } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
 import { anonymizeIp } from '../utils/anonymizeIp'
+import { rejectInvalid, isMissingColumnError } from '../utils/validation'
+import { insertRow } from '../utils/db'
+import { summariseAnalytics, summaryWindow, PageViewRow } from '../services/analyticsSummary'
 
 const router = express.Router()
 
 // Track page visit (public)
+/**
+ * navigator.sendBeacon sends a string body as text/plain (no CORS preflight).
+ * Parse it as JSON so it goes through the same validation (H-15).
+ */
+const parseTextJson = (req: Request, res: Response, next: NextFunction) => {
+  if (typeof req.body === 'string') {
+    try {
+      const parsed = JSON.parse(req.body)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object')
+      req.body = parsed
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid input', details: [{ path: 'body', msg: 'Body must be JSON' }] })
+    }
+  }
+  if (req.body === undefined) req.body = {}
+  return next()
+}
+
 router.post('/track', [
+  express.text({ type: 'text/plain', limit: '16kb' }),
+  parseTextJson,
   body('page_path').isLength({ min: 1 }).trim(),
-  body('page_title').optional().isLength({ min: 1 }).trim(),
+  body('page_title').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
   body('session_id').isLength({ min: 1 }).trim(),
   body('referrer').optional().custom((value) => {
     if (value === null || value === '' || value === undefined) return true
@@ -19,14 +42,7 @@ router.post('/track', [
   body('visit_duration').optional().isInt({ min: 0 })
 ], async (req: Request, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
-    }
+    if (rejectInvalid(req, res)) return
 
     const {
       page_path,
@@ -60,21 +76,21 @@ router.post('/track', [
 
     if (hasExistingVisit && visit_duration > 0) {
       // Update existing visit with duration
-      await supabaseService.update('analytics', existingVisit.id, {
-        visit_duration,
-        updated_at: new Date().toISOString()
-      })
+      const update: Record<string, any> = { visit_duration, updated_at: new Date().toISOString() }
+      if (page_title) update.page_title = page_title
+      await supabaseService.update('analytics', existingVisit.id, update)
     } else {
       // Insert new visit (add required event_type field)
-      await supabaseService.insert('analytics', {
+      await insertRow('analytics', {
         session_id,
         page_path,
+        page_title: page_title || null,
         user_agent,
         ip_address,
         referrer,
         visit_duration,
         event_type: 'page_view' // Required field
-      })
+      }, ['page_title'])
     }
 
     return res.json({
@@ -90,6 +106,58 @@ router.post('/track', [
   }
 })
 
+
+const SUMMARY_COLUMNS = 'session_id, page_path, page_title, referrer, visit_duration, created_at'
+const SUMMARY_LEGACY = 'session_id, page_path, referrer, visit_duration, created_at'
+const PAGE_SIZE = 1000
+
+/** Reads every page_view row in the window, 1000 at a time. */
+async function readWindow(fromIso: string, toExclusiveIso: string): Promise<PageViewRow[]> {
+  const client = getServices().supabaseService.getClient()
+  const rows: PageViewRow[] = []
+  let columns = SUMMARY_COLUMNS
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const run = (cols: string) =>
+      client
+        .from('analytics')
+        .select(cols)
+        .eq('event_type', 'page_view')
+        .gte('created_at', fromIso)
+        .lt('created_at', toExclusiveIso)
+        .order('created_at', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1)
+    let { data, error } = await run(columns)
+    if (error && columns === SUMMARY_COLUMNS && isMissingColumnError(error)) {
+      columns = SUMMARY_LEGACY
+      ;({ data, error } = await run(columns))
+    }
+    if (error) throw error
+    const page = (data || []) as unknown as PageViewRow[]
+    rows.push(...page)
+    if (page.length < PAGE_SIZE) return rows
+  }
+}
+
+// Last N days summary for the admin Analytics page (H-1)
+router.get('/summary', [
+  authenticate,
+  authorize('admin'),
+  query('days').optional().isInt({ min: 1, max: 365 }).withMessage('days is a whole number from 1 to 365').toInt()
+], async (req: AuthRequest, res: Response) => {
+  try {
+    if (rejectInvalid(req, res)) return
+    const days = req.query.days ? Number(req.query.days) : 30
+    const now = new Date()
+    const win = summaryWindow(days, now)
+    const rows = await readWindow(win.fromIso, win.toExclusiveIso)
+    return res.json({ success: true, data: summariseAnalytics(rows, days, now) })
+  } catch (error) {
+    console.error('Get analytics summary error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Deprecated: replaced by /summary (H-1). Kept until the admin confirms the switch.
 // Get analytics overview (admin only)
 router.get('/overview', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
   try {

@@ -1,221 +1,146 @@
 'use client'
 
-import { motion } from 'framer-motion'
-import { Briefcase, Calendar, MapPin, ExternalLink, Award } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import Button from '@/components/ui/Button'
+import { Chip, Stat } from '@/components/ui/Chip'
+import Spark from '@/components/ui/Spark'
+import { useOverlay } from '@/components/overlays/OverlayProvider'
+import type { Education, WorkRole } from '@/lib/api'
+import { formatRange } from '@/lib/format'
+import { degreeTitle, yearOf } from '@/lib/selectors'
+import { contact, experienceHero } from '@/lib/content/site'
 
-interface WorkExperience {
-  id: number
-  company: string
-  position: string
-  location: string
-  start_date: string
-  end_date: string | null
-  description: string
-  achievements: string[]
-  technologies: string[]
-  company_url?: string
-}
+const delay = (ms: number) => ({ ['--d' as string]: `${ms}ms` }) as CSSProperties
 
-interface Education {
-  id: number
-  institution: string
-  degree: string
-  field_of_study?: string
-  location: string
-  start_date: string
-  end_date: string | null
-  grade?: string
-  description: string
-  achievements: string[]
-}
-
-interface Certification {
-  id: number
-  name: string
-  issuer: string
-  issue_date: string
-  expiry_date: string | null
-  credential_id?: string
-  credential_url?: string
-  description: string
-  skills: string[]
-}
-
-interface ExperienceClientProps {
-  workExperience: WorkExperience[]
-  education: Education[]
-  certifications: Certification[]
-}
-
-export default function ExperienceClient({
-  workExperience,
-  education,
-  certifications,
-}: ExperienceClientProps) {
-  const calculateDuration = (start_date: string, end_date: string | null) => {
-    const start = new Date(start_date)
-    const end = end_date ? new Date(end_date) : new Date()
-    let diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
-    if (end.getDate() < start.getDate()) diffMonths--
-    if (diffMonths <= 0 && end > start) diffMonths = 1
-    if (diffMonths < 12) return `${diffMonths} month${diffMonths !== 1 ? 's' : ''}`
-    const years = Math.floor(diffMonths / 12)
-    const months = diffMonths % 12
-    return `${years} year${years !== 1 ? 's' : ''}${months > 0 ? ` ${months} month${months !== 1 ? 's' : ''}` : ''}`
-  }
-
+function Role({ role, index, last }: { role: WorkRole; index: number; last: boolean }) {
+  const current = !role.end_date
+  const achievements = role.achievements ?? []
+  const highlights = role.highlights ?? []
+  const technologies = role.technologies ?? []
+  const big = index === 0
   return (
-    <div className="min-h-screen py-20" style={{ background: 'linear-gradient(135deg, #fdf2f8 0%, #f8f4ff 50%, #fff8f0 100%)' }}>
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-20 left-10 text-4xl opacity-15 float-animation">💼</div>
-        <div className="absolute top-40 right-20 text-3xl opacity-20 sparkle-animation">✨</div>
-        <div className="absolute bottom-40 left-20 text-5xl opacity-10 float-animation">🏆</div>
-        <div className="absolute bottom-20 right-10 text-3xl opacity-15 sparkle-animation">💫</div>
-        <div className="absolute top-1/2 left-1/4 text-3xl opacity-10">🌟</div>
+    <li className="exp-role">
+      <div className="exp-when">
+        <strong style={{ display: 'block' }}>{formatRange(role.start_date, role.end_date, 'site')}</strong>
+        {role.location && <span>{role.location}</span>}
       </div>
-      
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center mb-16">
-          <h1 className="text-5xl sm:text-6xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>💼 Experience</h1>
-          <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">My professional journey as a software engineer, showcasing growth, achievements, and the technologies I've mastered along the way! ✨</p>
-        </motion.div>
-
-        <section className="mb-16">
-          <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }} className="text-4xl font-bold gradient-text mb-8 flex items-center" style={{ fontFamily: 'Playfair Display, serif' }}>
-            <Briefcase className="w-8 h-8 mr-3 text-pink-600" />
-            💼 Professional Experience
-          </motion.h2>
-          {workExperience.length === 0 && (
-            <div className="text-center py-10">
-              <p className="text-gray-700 font-medium">No work history available at the moment. Check back soon! ✨</p>
-            </div>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+        {!last && (
+          <span className="exp-grow" aria-hidden="true" style={{ position: 'absolute', top: 34, bottom: 0, width: 3, borderRadius: 3, background: 'linear-gradient(var(--c1), #e8c6f7)' }} />
+        )}
+        <Spark className="exp-pop" style={{ width: big ? 28 : 22, height: big ? 28 : 22, marginTop: big ? 6 : 8, color: index % 2 === 0 ? 'var(--c1)' : '#b388ff' }} />
+      </div>
+      <div className="sv" style={{ paddingBottom: last ? 40 : 72, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start', minWidth: 0 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <h3 className="serif" style={{ fontSize: 'var(--t-h3)' }}>{role.position}</h3>
+          {current && (
+            <span style={{ padding: '4px 12px', borderRadius: 99, background: 'linear-gradient(45deg, var(--b1), var(--b2))', color: '#fff', fontSize: 'var(--t-sm)', fontWeight: 600 }}>
+              Current
+            </span>
           )}
-          <div className="space-y-8">
-            {workExperience.map((job, index) => (
-              <motion.div key={job.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card card--no-top-bar p-6 border-l-4 border-l-pink-400 hover:scale-105 transition-transform">
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <h3 className="text-xl font-semibold text-gray-800 mr-3" style={{ fontFamily: 'Poppins, sans-serif' }}>{job.position}</h3>
-                      {!job.end_date && <span className="px-3 py-1 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-full text-xs font-semibold">Current ✨</span>}
-                    </div>
-                    <div className="flex items-center text-pink-600 mb-2">
-                      <a href={job.company_url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline flex items-center">
-                        {job.company}
-                        <ExternalLink className="w-4 h-4 ml-1" />
-                      </a>
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:items-center text-gray-600 text-sm space-y-1 sm:space-y-0 sm:space-x-4 font-medium">
-                      <div className="flex items-center"><MapPin className="w-4 h-4 mr-1 text-pink-500" />{job.location}</div>
-                      <div className="flex items-center"><Calendar className="w-4 h-4 mr-1 text-pink-500" />{new Date(job.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - {job.end_date ? new Date(job.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present'}</div>
-                      <div className="text-purple-600">({calculateDuration(job.start_date, job.end_date)})</div>
-                    </div>
-                  </div>
-                </div>
-                <p className="text-gray-600 mb-4 font-medium">{job.description}</p>
-                {job.achievements && job.achievements.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>🏆 Key Achievements:</h4>
-                    <ul className="space-y-2">
-                      {job.achievements.map((achievement, i) => (
-                        <li key={i} className="flex items-start"><span className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span><span className="text-gray-600 text-sm font-medium">{achievement}</span></li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {job.technologies && job.technologies.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>💻 Technologies:</h4>
-                    <div className="flex flex-wrap gap-2">{job.technologies.map((tech) => (<span key={tech} className="tech-tag">{tech}</span>))}</div>
-                  </div>
-                )}
-              </motion.div>
+        </div>
+        <p style={{ fontSize: 'var(--t-meta)', fontWeight: 600, color: 'var(--b2)' }}>
+          {role.company_url ? (
+            <a href={role.company_url} target="_blank" rel="noopener noreferrer">
+              {role.company}
+            </a>
+          ) : (
+            role.company
+          )}
+        </p>
+        {role.description && <p style={{ lineHeight: 1.65, maxWidth: '60ch' }}>{role.description}</p>}
+        {achievements.length > 0 && (
+          <ul style={{ paddingLeft: 20, lineHeight: 1.7, fontSize: 'var(--t-meta)' }}>
+            {achievements.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        )}
+        {highlights.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {highlights.map((h) => (
+              <Stat key={h}>{h}</Stat>
             ))}
           </div>
-        </section>
-
-        {education.length > 0 && (
-          <section className="mb-16">
-            <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }} className="text-4xl font-bold gradient-text mb-8 flex items-center" style={{ fontFamily: 'Playfair Display, serif' }}>
-              <Award className="w-8 h-8 mr-3 text-pink-600" />
-              🎓 Education
-            </motion.h2>
-            <div className="space-y-6">
-              {education.map((edu, index) => (
-                <motion.div key={edu.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card p-6 hover:scale-105 transition-transform">
-                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>{edu.degree}{edu.field_of_study && ` in ${edu.field_of_study}`}</h3>
-                      <p className="text-pink-600 font-semibold mb-2">{edu.institution}</p>
-                      <div className="flex flex-col sm:flex-row sm:items-center text-gray-600 text-sm space-y-1 sm:space-y-0 sm:space-x-4 font-medium">
-                        <div className="flex items-center"><MapPin className="w-4 h-4 mr-1 text-pink-500" />{edu.location}</div>
-                        <div className="flex items-center"><Calendar className="w-4 h-4 mr-1 text-pink-500" />{new Date(edu.start_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - {edu.end_date ? new Date(edu.end_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'Present'}</div>
-                      </div>
-                    </div>
-                    {edu.grade && <div className="mt-4 lg:mt-0"><span className="px-4 py-2 bg-gradient-to-r from-pink-400 to-purple-500 text-white rounded-full text-sm font-semibold">✨ {edu.grade}</span></div>}
-                  </div>
-                  {edu.description && <p className="text-gray-600 font-medium mb-4">{edu.description}</p>}
-                  {edu.achievements && edu.achievements.length > 0 && (
-                    <div className="mt-4">
-                      {(() => {
-                        const courses = edu.achievements.filter(a => a.toLowerCase().startsWith('course:'))
-                        const activities = edu.achievements.filter(a => a.toLowerCase().startsWith('activities:'))
-                        const other = edu.achievements.filter(a => !a.toLowerCase().startsWith('course:') && !a.toLowerCase().startsWith('activities:'))
-                        return (
-                          <>
-                            {courses.length > 0 && (
-                              <div className="mb-4">
-                                <h4 className="font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>📚 Course Work:</h4>
-                                <ul className="space-y-2">{courses.map((achievement, i) => (<li key={i} className="flex items-start"><span className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span><span className="text-gray-600 text-sm font-medium">{achievement.replace(/^course:\s*/i, '')}</span></li>))}</ul>
-                              </div>
-                            )}
-                            {activities.length > 0 && (
-                              <div className="mb-4">
-                                <h4 className="font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>🎯 Extra Activities I've Done:</h4>
-                                <ul className="space-y-2">{activities.map((achievement, i) => (<li key={i} className="flex items-start"><span className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span><span className="text-gray-600 text-sm font-medium">{achievement.replace(/^activities:\s*/i, '')}</span></li>))}</ul>
-                              </div>
-                            )}
-                            {other.length > 0 && (
-                              <div className="mb-4">
-                                <h4 className="font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>🏆 Achievements:</h4>
-                                <ul className="space-y-2">{other.map((achievement, i) => (<li key={i} className="flex items-start"><span className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full mt-2 mr-3 flex-shrink-0"></span><span className="text-gray-600 text-sm font-medium">{achievement}</span></li>))}</ul>
-                              </div>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
-          </section>
         )}
-
-        {certifications.length > 0 && (
-          <section>
-            <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }} className="text-4xl font-bold gradient-text mb-8 flex items-center" style={{ fontFamily: 'Playfair Display, serif' }}>
-              <Award className="w-8 h-8 mr-3 text-pink-600" />
-              🏆 Certifications
-            </motion.h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {certifications.map((cert, index) => (
-                <motion.div key={cert.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: index * 0.1 }} viewport={{ once: true }} className="card p-6 text-center hover:scale-105 transition-transform">
-                  <div className="w-16 h-16 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4"><Award className="w-8 h-8 text-pink-600" /></div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>{cert.name}</h3>
-                  <p className="text-pink-600 font-semibold mb-2">{cert.issuer}</p>
-                  <p className="text-sm text-gray-600 mb-4 font-medium">Issued: {new Date(cert.issue_date).toLocaleDateString()}</p>
-                  <a href={cert.credential_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-pink-600 hover:text-purple-600 hover:underline text-sm font-semibold transition-colors">
-                    View Credential ✨
-                    <ExternalLink className="w-3 h-3 ml-1" />
-                  </a>
-                </motion.div>
-              ))}
-            </div>
-          </section>
+        {technologies.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {technologies.map((t) => (
+              <Chip key={t}>{t}</Chip>
+            ))}
+          </div>
         )}
       </div>
-    </div>
+    </li>
   )
 }
 
+export default function ExperienceClient({ roles, education }: { roles: WorkRole[]; education: Education[] }) {
+  const { openContact } = useOverlay()
+  const edu = education[0]
+  const years = edu ? [yearOf(edu.start_date), yearOf(edu.end_date)].filter(Boolean).join(' – ') : ''
+
+  return (
+    <>
+      <div className="under-header" style={{ background: 'linear-gradient(160deg, #f8f4ff 0%, #fff8f0 60%, #efe4ff 100%)', ['--t-h3' as string]: 'clamp(26px, 2.4vw, 34px)' } as CSSProperties}>
+        <section className="wrap wrap-narrow" style={{ paddingTop: 100, paddingBottom: 100, position: 'relative' }}>
+          <Spark className="twinkle" style={{ ['--d' as string]: '.5s', position: 'absolute', right: '8%', top: 80, width: 30, height: 30, color: 'var(--c1)' } as CSSProperties} />
+          <h1 className="serif in" style={{ fontSize: 'clamp(52px, 6.4vw, 96px)', lineHeight: 1.05 }}>
+            My{' '}
+            <span className="script grad-text" style={{ fontSize: '1.15em', color: 'var(--c2)', paddingRight: '.1em' }}>
+              experience
+            </span>
+          </h1>
+          <p className="in" style={{ ...delay(200), marginTop: 20, fontSize: 'var(--t-lead)', lineHeight: 1.6, maxWidth: '48ch' }}>{experienceHero.lead}</p>
+          <div className="in" style={{ ...delay(350), display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 28 }}>
+            {experienceHero.stats.map((s) => (
+              <Stat key={s}>{s}</Stat>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ ['--t-h3' as string]: 'clamp(26px, 2.4vw, 34px)' } as CSSProperties}>
+        <section className="wrap wrap-narrow" style={{ paddingTop: 100, paddingBottom: 60 }}>
+          <h2 className="serif sv" style={{ fontSize: 'var(--t-h3)', marginBottom: 56 }}>Where I’ve worked</h2>
+          {roles.length === 0 ? (
+            <p style={{ fontSize: 'var(--t-lead)' }}>Work history is on its way.</p>
+          ) : (
+            <ol style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column' }}>
+              {roles.map((role, i) => (
+                <Role key={role.id ?? `${role.company}-${role.start_date}`} role={role} index={i} last={i === roles.length - 1} />
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section className="wrap wrap-narrow" style={{ paddingTop: 60, paddingBottom: 120 }}>
+          <div className="sv" style={{ borderRadius: 32, background: 'linear-gradient(135deg, #fdf2fb, #f3e8ff)', padding: 'clamp(28px, 5vw, 56px)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))', gap: 32, alignItems: 'center' }}>
+            <div>
+              <h2 className="serif" style={{ fontSize: 'var(--t-h3)' }}>Education</h2>
+              {edu ? (
+                <>
+                  <p style={{ marginTop: 12, fontWeight: 600 }}>{degreeTitle(edu)}</p>
+                  <p style={{ fontSize: 'var(--t-meta)', color: 'var(--b2)', fontWeight: 600 }}>
+                    {[edu.institution, years].filter(Boolean).join(', ')}
+                  </p>
+                  {edu.description && <p style={{ marginTop: 12, lineHeight: 1.65, fontSize: 'var(--t-meta)' }}>{edu.description}</p>}
+                  {edu.grade && <p style={{ marginTop: 8, fontSize: 'var(--t-meta)', fontWeight: 600 }}>Grade: {edu.grade}</p>}
+                </>
+              ) : null}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
+              <p className="script" style={{ fontSize: 44, color: 'var(--c2)', lineHeight: 1.1 }}>Want the full story?</p>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <Button onClick={openContact}>Get in touch</Button>
+                <Button href={contact.linkedin} variant="line">
+                  LinkedIn
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </>
+  )
+}

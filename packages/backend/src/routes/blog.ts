@@ -1,440 +1,267 @@
 import express from 'express'
-import { body, validationResult } from 'express-validator'
+import { body } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { toStringArray, parseListInput } from '../utils/lists'
+import { rejectInvalid, sendInvalid, FieldError } from '../utils/validation'
+import { insertRow, updateRow, selectById, Row } from '../utils/db'
+import { generateSlug } from './projects'
 
 const router = express.Router()
 
-// Get all published blog posts (public)
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+export const BLOG_DEFAULT_LIMIT = 50
+export const BLOG_MAX_LIMIT = 100
+
+const LIST_COLUMNS = 'id, title, slug, excerpt, created_at, category, tags, featured, author, read_time, cover_image'
+const SINGLE_COLUMNS = 'id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, cover_image'
+const ADMIN_COLUMNS = 'id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, published, cover_image'
+
+/** `created_at` is the publish date (the admin's Publish date writes it). */
+export function formatPost(post: Row) {
+  const out: Row = {
+    ...post,
+    tags: toStringArray(post.tags),
+    featured: Boolean(post.featured),
+    publish_date: post.created_at
+  }
+  if ('published' in post) out.published = Boolean(post.published)
+  return out
+}
+
+/** Clamps `limit` to 1..100 (default 50) and `offset` to >= 0. */
+export function pageParams(limit: unknown, offset: unknown): { from: number; to: number } {
+  let l = parseInt(String(limit ?? ''), 10)
+  if (!Number.isFinite(l) || l < 1) l = BLOG_DEFAULT_LIMIT
+  l = Math.min(l, BLOG_MAX_LIMIT)
+  let o = parseInt(String(offset ?? ''), 10)
+  if (!Number.isFinite(o) || o < 0) o = 0
+  return { from: o, to: o + l - 1 }
+}
+
+/** Removes the characters that would break or extend a PostgREST `or` filter. */
+export function cleanSearch(search: unknown): string {
+  return String(search ?? '').replace(/[,()%*\\]/g, ' ').trim()
+}
+
+const textField = (name: string, max: number) =>
+  body(name)
+    .optional({ nullable: true })
+    .custom((v) => typeof v === 'string')
+    .withMessage(`${name} must be text`)
+    .bail()
+    .isLength({ max })
+    .withMessage(`${name} is at most ${max} characters`)
+
+const validators = (isCreate: boolean) => [
+  isCreate
+    ? body('title').isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title is required')
+    : body('title').optional().isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title cannot be empty'),
+  textField('excerpt', 1000),
+  textField('content', 200000),
+  textField('category', 100),
+  textField('author', 255),
+  textField('cover_image', 2000),
+  body('slug').optional({ nullable: true }).custom((v) => typeof v === 'string').withMessage('Invalid slug'),
+  body('tags').optional({ nullable: true }).custom((v) => parseListInput(v, ',') !== null).withMessage('Tags must be a list'),
+  body('featured').optional().custom((v) => typeof v === 'boolean').withMessage('Featured is true or false'),
+  body('published').optional().custom((v) => typeof v === 'boolean').withMessage('Published is true or false'),
+  body('read_time').optional({ nullable: true }).isInt({ min: 0, max: 600 }).withMessage('Read time is a whole number of minutes').toInt(),
+  body('publish_date').optional({ nullable: true }).custom((v) => v === '' || (typeof v === 'string' && !Number.isNaN(Date.parse(v)))).withMessage('Publish date must be a date')
+]
+
+function toPayload(input: Row): Row {
+  const out: Row = {}
+  for (const key of ['title', 'excerpt', 'content', 'category']) {
+    if (key in input) out[key] = input[key] == null ? '' : String(input[key]).trim()
+  }
+  if ('author' in input && input.author) out.author = String(input.author).trim()
+  if ('read_time' in input && input.read_time !== null && input.read_time !== undefined) out.read_time = input.read_time
+  if ('cover_image' in input) out.cover_image = input.cover_image ? String(input.cover_image).trim() || null : null
+  if ('tags' in input) out.tags = parseListInput(input.tags, ',') || []
+  if ('featured' in input) out.featured = input.featured === true
+  if ('published' in input) out.published = input.published === true
+  if ('publish_date' in input && input.publish_date) out.created_at = input.publish_date
+  return out
+}
+
+/** A published post needs an excerpt, content and category (H-3). */
+function publishErrors(merged: Row): FieldError[] {
+  if (!merged.published) return []
+  return ['excerpt', 'content', 'category']
+    .filter((k) => !String(merged[k] ?? '').trim())
+    .map((k) => ({ path: k, msg: `${k[0].toUpperCase()}${k.slice(1)} is required to publish` }))
+}
+
+async function slugTaken(slug: string, exceptId?: string): Promise<boolean> {
+  let q = getServices().supabaseService.getClient().from('blog_posts').select('id').eq('slug', slug)
+  if (exceptId) q = q.neq('id', exceptId)
+  const { data, error } = await q.limit(1)
+  if (error) throw error
+  return Array.isArray(data) && data.length > 0
+}
+
+async function clearOtherFeatured(id: number | string): Promise<number[]> {
+  const { data, error } = await getServices().supabaseService.getClient()
+    .from('blog_posts')
+    .update({ featured: false, updated_at: new Date().toISOString() })
+    .neq('id', id)
+    .eq('featured', true)
+    .select('id')
+  if (error) throw error
+  return (data || []).map((r: Row) => Number(r.id))
+}
+
+// Published posts (public), newest publish date first
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { category, search, limit = 10, offset = 0 } = req.query
+    const { category, search, limit, offset } = req.query
+    const { from, to } = pageParams(limit, offset)
 
-    const { supabaseService } = getServices()
-    
-    let query = supabaseService.getClient()
+    let query = getServices().supabaseService.getClient()
       .from('blog_posts')
-      .select('id, title, slug, excerpt, created_at, category, tags, featured, author, read_time, cover_image')
+      .select(LIST_COLUMNS)
       .eq('published', true)
 
-    // Add category filter
-    if (category) {
-      query = query.eq('category', category as string)
-    }
+    if (category) query = query.eq('category', String(category))
 
-    // Add search filter
-    if (search) {
-      query = query.or(`title.ilike.%${search}%,excerpt.ilike.%${search}%`)
-    }
+    const term = cleanSearch(search)
+    if (term) query = query.or(`title.ilike.%${term}%,excerpt.ilike.%${term}%`)
 
-    // Add ordering and pagination
-    query = query
-      .order('created_at', { ascending: false })
-      .range(Number(offset), Number(offset) + Number(limit) - 1)
-
-    const { data: posts, error } = await query
+    const { data: posts, error } = await query.order('created_at', { ascending: false }).range(from, to)
     if (error) throw error
 
-    const parsedPosts = posts.map((post: any) => {
-      let tags = []
-      try {
-        if (post.tags) {
-          // Try to parse as JSON first
-          tags = JSON.parse(post.tags)
-        }
-      } catch (error) {
-        // If JSON parsing fails, treat as comma-separated string
-        if (typeof post.tags === 'string') {
-          tags = post.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
-        }
-      }
-      
-      return {
-        ...post,
-        tags,
-        featured: Boolean(post.featured),
-        publish_date: post.created_at
-      }
-    })
-
-    return res.json({
-      success: true,
-      data: parsedPosts
-    })
+    return res.json({ success: true, data: (posts || []).map(formatPost) })
   } catch (error) {
     console.error('Get blog posts error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get single blog post by slug (public)
+// Every post incl. drafts (admin). Registered before /:slug.
+router.get('/admin/all', [authenticate, authorize('admin')], async (_req: AuthRequest, res: Response) => {
+  try {
+    const { data: posts, error } = await getServices().supabaseService.getClient()
+      .from('blog_posts')
+      .select(ADMIN_COLUMNS)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return res.json({ success: true, data: (posts || []).map(formatPost) })
+  } catch (error) {
+    console.error('Get all blog posts error:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Single published post by slug (public)
 router.get('/:slug', async (req: Request, res: Response) => {
   try {
-    const { slug } = req.params
-    const { supabaseService } = getServices()
-    
-    const { data: post, error } = await supabaseService.getClient()
+    const slug = String(req.params.slug)
+    const { data: post, error } = await getServices().supabaseService.getClient()
       .from('blog_posts')
-      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, cover_image')
+      .select(SINGLE_COLUMNS)
       .eq('slug', slug)
       .eq('published', true)
       .maybeSingle()
-
     if (error) throw error
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog post not found'
-      })
-    }
-
-    let tags = []
-    try {
-      if (post.tags) {
-        // Try to parse as JSON first
-        tags = JSON.parse(post.tags)
-      }
-    } catch (error) {
-      // If JSON parsing fails, treat as comma-separated string
-      if (typeof post.tags === 'string') {
-        tags = post.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
-      }
-    }
-
-    const parsedPost = {
-      ...post,
-      tags,
-      featured: Boolean(post.featured),
-      publish_date: post.created_at
-    }
-
-    return res.json({
-      success: true,
-      data: parsedPost
-    })
+    if (!post) return res.status(404).json({ success: false, error: 'Blog post not found' })
+    return res.json({ success: true, data: formatPost(post) })
   } catch (error) {
     console.error('Get blog post error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get all blog posts for admin (admin only)
-router.get('/admin/all', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
+// Create (admin). A draft needs only a title.
+router.post('/', [authenticate, authorize('admin'), ...validators(true)], async (req: AuthRequest, res: Response) => {
   try {
-    const { supabaseService } = getServices()
-    
-    const { data: posts, error } = await supabaseService.getClient()
-      .from('blog_posts')
-      .select('id, title, slug, excerpt, content, author, read_time, created_at, category, tags, featured, published, cover_image')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
+    if (rejectInvalid(req, res)) return
 
-    const parsedPosts = posts.map((post: any) => {
-      let tags = []
-      try {
-        if (post.tags) {
-          // Try to parse as JSON first
-          tags = JSON.parse(post.tags)
-        }
-      } catch (error) {
-        // If JSON parsing fails, treat as comma-separated string
-        if (typeof post.tags === 'string') {
-          tags = post.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
-        }
-      }
-      
-      return {
-        ...post,
-        tags,
-        featured: Boolean(post.featured),
-        published: Boolean(post.published),
-        publish_date: post.created_at
-      }
-    })
-
-    return res.json({
-      success: true,
-      data: parsedPosts
-    })
-  } catch (error) {
-    console.error('Get all blog posts error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
-  }
-})
-
-// Create blog post (admin only)
-router.post('/', [
-  authenticate,
-  authorize('admin'),
-  body('title').isLength({ min: 1 }).trim(),
-  body('excerpt').isLength({ min: 1 }).trim(),
-  body('content').isLength({ min: 1 }).trim(),
-  body('category').isLength({ min: 1 }).trim(),
-  body('tags').isArray({ min: 1 }),
-  body('featured').optional().isBoolean(),
-  body('published').optional().isBoolean(),
-  body('cover_image').optional().isString()
-], async (req: AuthRequest, res: Response) => {
-  try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
+    const payload: Row = {
+      excerpt: '',
+      content: '',
+      category: '',
+      tags: [],
+      featured: false,
+      published: false,
+      ...toPayload(req.body)
     }
+    const errors = publishErrors(payload)
+    if (errors.length) return sendInvalid(res, errors)
 
-    const { title, excerpt, content, category, tags, featured = false, published = false, author, read_time, publish_date, cover_image } = req.body
-
-    const { supabaseService } = getServices()
-    // Create slug from title
-    let slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    
-    // Check if slug already exists and generate unique slug
-    let uniqueSlug = slug
-    let counter = 1
-    while (true) {
-      try {
-        const { data } = await supabaseService.getClient()
-          .from('blog_posts')
-          .select('id')
-          .eq('slug', uniqueSlug)
-          .single()
-        
-        // If we get here, slug exists, try next one
-        if (data) {
-          uniqueSlug = `${slug}-${counter}`
-          counter++
-        } else {
-          // Slug doesn't exist, we can use it
-          break
-        }
-      } catch (error) {
-        // Slug doesn't exist (error means no match found), we can use it
-        break
-      }
+    const requested = typeof req.body.slug === 'string' ? req.body.slug.trim() : ''
+    const baseSlug = requested || generateSlug(payload.title)
+    if (!baseSlug || !SLUG_RE.test(baseSlug)) {
+      return res.status(400).json({ success: false, error: 'Invalid slug', details: [{ path: 'slug', msg: 'Invalid slug' }] })
     }
+    let slug = baseSlug
+    for (let n = 1; await slugTaken(slug); n++) slug = `${baseSlug}-${n}`
 
-    // Insert new blog post
-    const insertData: any = {
-      title,
-      slug: uniqueSlug,
-      excerpt,
-      content,
-      category,
-      tags,
-      featured,
-      published
-    }
-
-    // Add optional fields if provided
-    if (author) insertData.author = author
-    if (read_time) insertData.read_time = read_time
-    if (cover_image !== undefined && cover_image !== null && cover_image !== '') {
-      insertData.cover_image = cover_image
-    }
-    if (publish_date) {
-      // Use created_at as the publish date (publish_date column may not exist)
-      insertData.created_at = publish_date
-    }
-
-    const newPost = await supabaseService.insert('blog_posts', insertData)
-
-    return res.status(201).json({
-      success: true,
-      data: {
-        ...newPost,
-        tags: (() => {
-          try {
-            if (newPost.tags) {
-              return JSON.parse(newPost.tags)
-            }
-            return []
-          } catch (error) {
-            if (typeof newPost.tags === 'string') {
-              return newPost.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
-            }
-            return []
-          }
-        })(),
-        featured: Boolean(newPost.featured),
-        published: Boolean(newPost.published)
-      }
-    })
+    const newPost = await insertRow('blog_posts', { ...payload, slug })
+    const unfeatured = newPost.featured ? await clearOtherFeatured(newPost.id) : []
+    return res.status(201).json({ success: true, data: { ...formatPost(newPost), published: Boolean(newPost.published), unfeatured } })
   } catch (error) {
     console.error('Create blog post error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Update blog post by ID (admin only)
-router.put('/:id', [
-  authenticate,
-  authorize('admin'),
-  body('title').optional().isLength({ min: 1 }).trim(),
-  body('excerpt').optional().isLength({ min: 1 }).trim(),
-  body('content').optional().isLength({ min: 1 }).trim(),
-  body('category').optional().isLength({ min: 1 }).trim(),
-  body('tags').optional().isArray({ min: 1 }),
-  body('featured').optional().isBoolean(),
-  body('published').optional().isBoolean(),
-  body('cover_image').optional().isString()
-], async (req: AuthRequest, res: Response) => {
+// Update (admin, partial). The publish rule applies to existing + body.
+router.put('/:id', [authenticate, authorize('admin'), ...validators(false)], async (req: AuthRequest, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
-    }
+    if (rejectInvalid(req, res)) return
+    const id = String(req.params.id)
 
-    const { id } = req.params
-    const updateData = req.body
-    const { supabaseService } = getServices()
+    const existing = await selectById('blog_posts', id, ADMIN_COLUMNS)
+    if (!existing) return res.status(404).json({ success: false, error: 'Blog post not found' })
 
-    // Check if post exists
-    let existingPost
-    try {
-      existingPost = await supabaseService.selectOne('blog_posts', id)
-    } catch (error) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog post not found'
-      })
-    }
+    const payload = toPayload(req.body)
+    const errors = publishErrors({ ...existing, ...payload })
+    if (errors.length) return sendInvalid(res, errors)
 
-    if (!existingPost) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog post not found'
-      })
-    }
-
-    // Check slug uniqueness if slug is being updated
-    if (updateData.slug && updateData.slug !== existingPost.slug) {
-      try {
-        const { data: slugCheck } = await supabaseService.getClient()
-          .from('blog_posts')
-          .select('id')
-          .eq('slug', updateData.slug)
-          .neq('id', id)
-          .single()
-        
-        if (slugCheck) {
-          return res.status(400).json({
-            success: false,
-            error: 'Slug already exists. Please choose a different slug.'
-          })
-        }
-      } catch (error) {
-        // Slug doesn't exist, which is good - continue
+    if ('slug' in req.body) {
+      const slug = String(req.body.slug ?? '').trim()
+      if (!SLUG_RE.test(slug)) {
+        return res.status(400).json({ success: false, error: 'Invalid slug', details: [{ path: 'slug', msg: 'Invalid slug' }] })
       }
+      if (slug !== existing.slug && (await slugTaken(slug, id))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Slug already exists. Please choose a different slug.',
+          details: [{ path: 'slug', msg: 'Slug already exists' }]
+        })
+      }
+      payload.slug = slug
     }
 
-    // Prepare update data
-    const updatePayload: any = {}
-    
-    Object.keys(updateData).forEach(key => {
-      if (key === 'tags') {
-        // Stringify tags array
-        updatePayload[key] = JSON.stringify(updateData[key])
-      } else if (key === 'publish_date') {
-        // Handle publish_date - only update created_at since publish_date column may not exist
-        // Use created_at as the publish date
-        updatePayload.created_at = updateData[key]
-      } else if (key === 'cover_image') {
-        const v = updateData[key]
-        updatePayload.cover_image = v === '' || v === undefined ? null : v
-      } else {
-        updatePayload[key] = updateData[key]
-      }
-    })
+    payload.updated_at = new Date().toISOString()
+    const updated = await updateRow('blog_posts', id, payload)
+    if (!updated) return res.status(404).json({ success: false, error: 'Blog post not found' })
 
-    // Add updated_at timestamp
-    updatePayload.updated_at = new Date().toISOString()
-
-    // Update the post using Supabase client method
-    const updatedPost = await supabaseService.update('blog_posts', id, updatePayload)
-
-    return res.json({
-      success: true,
-      data: {
-        ...updatedPost,
-        tags: (() => {
-          try {
-            if (updatedPost.tags) {
-              return JSON.parse(updatedPost.tags)
-            }
-            return []
-          } catch (error) {
-            if (typeof updatedPost.tags === 'string') {
-              return updatedPost.tags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0)
-            }
-            return []
-          }
-        })(),
-        featured: Boolean(updatedPost.featured),
-        published: Boolean(updatedPost.published)
-      }
-    })
+    const unfeatured = payload.featured === true ? await clearOtherFeatured(updated.id) : []
+    return res.json({ success: true, data: { ...formatPost(updated), published: Boolean(updated.published), unfeatured } })
   } catch (error) {
     console.error('Update blog post error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Delete blog post (admin only)
+// Delete (admin)
 router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
-    const { supabaseService } = getServices()
-
-    // Check if post exists and delete it
-    const { data: deletedPost, error } = await supabaseService.getClient()
+    const id = String(req.params.id)
+    const { data: deletedPost, error } = await getServices().supabaseService.getClient()
       .from('blog_posts')
       .delete()
       .eq('id', id)
       .select()
       .single()
-
-    if (error || !deletedPost) {
-      return res.status(404).json({
-        success: false,
-        error: 'Blog post not found'
-      })
-    }
-
-    return res.json({
-      success: true,
-      message: 'Blog post deleted successfully'
-    })
+    if (error || !deletedPost) return res.status(404).json({ success: false, error: 'Blog post not found' })
+    return res.json({ success: true, message: 'Blog post deleted successfully' })
   } catch (error) {
     console.error('Delete blog post error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 

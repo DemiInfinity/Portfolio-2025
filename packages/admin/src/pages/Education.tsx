@@ -1,457 +1,257 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { Plus, Edit, Trash2, GraduationCap, Calendar, MapPin } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { apiError, fieldErrors } from '@/lib/errors'
+import { lines, monthOf, monthToApi, plural, toArray } from '@/lib/format'
+import { useQ } from '@/hooks/useQ'
+import { useEditParam } from '@/hooks/useEditParam'
+import Dialog, { SaveButton } from '@/components/ui/Dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Field from '@/components/ui/Field'
+import Icon from '@/components/ui/Icon'
+import { SkeletonRows } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 
-interface Education {
+export interface EducationEntry {
   id: number
   institution: string
   degree: string
-  field_of_study?: string
-  location?: string
-  start_date: string
+  field_of_study?: string | null
+  location?: string | null
+  start_date?: string | null
   end_date?: string | null
-  gpa?: string
-  grade?: string
-  description?: string
-  achievements?: string[]
+  grade?: string | null
+  gpa?: string | null
+  description?: string | null
+  achievements: string[]
 }
 
-interface EducationForm {
-  institution: string
-  degree: string
-  field_of_study?: string
-  location?: string
-  start_date: string
-  end_date?: string | null
-  grade?: string
-  description?: string
-  achievements?: string[]
+type Draft = { institution: string; degree: string; field: string; location: string; start: string; end: string; grade: string; description: string; achievements: string }
+const EMPTY: Draft = { institution: '', degree: '', field: '', location: '', start: '', end: '', grade: '', description: '', achievements: '' }
+
+export const EDUCATION_KEY = ['education'] as const
+
+export const fetchEducation = async (): Promise<EducationEntry[]> => {
+  const res = await api.get('/education')
+  return ((res.data?.data || []) as EducationEntry[]).map((e) => ({ ...e, achievements: toArray(e.achievements) }))
 }
 
-const Education = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingEducation, setEditingEducation] = useState<Education | null>(null)
-  const [achievements, setAchievements] = useState<string[]>([])
-  const queryClient = useQueryClient()
+const yr = (v?: string | null) => (v ? monthOf(v).slice(0, 4) : '')
+const years = (start?: string | null, end?: string | null) => (yr(start) || '—') + ' – ' + (end ? yr(end) : 'now')
 
-  const { data: education, isLoading } = useQuery({
-    queryKey: ['education'],
-    queryFn: async () => {
-      const response = await api.get('/education')
-      return response.data.data as Education[]
-    }
-  })
+const toDraft = (e: EducationEntry): Draft => ({
+  institution: e.institution || '',
+  degree: e.degree || '',
+  field: e.field_of_study || '',
+  location: e.location || '',
+  start: monthOf(e.start_date),
+  end: monthOf(e.end_date),
+  grade: (e.grade ?? e.gpa ?? '').slice(0, 10),
+  description: e.description || '',
+  achievements: e.achievements.join('\n'),
+})
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EducationForm>({
-    defaultValues: {
-      achievements: []
-    }
-  })
+// H-3: education PUT is a full replace, so the whole form is always sent.
+const toBody = (d: Draft) => ({
+  institution: d.institution.trim(),
+  degree: d.degree.trim(),
+  field_of_study: d.field.trim(),
+  location: d.location.trim(),
+  start_date: monthToApi(d.start),
+  end_date: monthToApi(d.end),
+  grade: d.grade.trim(),
+  description: d.description.trim(),
+  achievements: lines(d.achievements),
+})
 
-  const createMutation = useMutation({
-    mutationFn: (data: EducationForm) => api.post('/education', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['education'] })
-      toast.success('Education entry created successfully')
-      setIsModalOpen(false)
-      reset()
-      setAchievements([])
+const PATH: Record<string, keyof Draft> = { institution: 'institution', degree: 'degree', field_of_study: 'field', location: 'location', start_date: 'start', end_date: 'end', grade: 'grade', gpa: 'grade', description: 'description', achievements: 'achievements' }
+
+const GRID = 'minmax(0, 1fr) auto 80px'
+
+export default function Education() {
+  const qc = useQueryClient()
+  const { say } = useToast()
+  const [q] = useQ()
+  const { data: entries, isLoading } = useQuery({ queryKey: EDUCATION_KEY, queryFn: fetchEducation })
+
+  const [editId, setEditId] = useState<number | 'new' | null>(null)
+  const [d, setD] = useState<Draft>(EMPTY)
+  const [tried, setTried] = useState(false)
+  const [serverErr, setServerErr] = useState<Record<string, string>>({})
+  const [confirming, setConfirming] = useState(false)
+
+  const open = (e: EducationEntry | null) => {
+    setEditId(e ? e.id : 'new')
+    setD(e ? toDraft(e) : EMPTY)
+    setTried(false)
+    setServerErr({})
+    setConfirming(false)
+  }
+  const close = () => setEditId(null)
+  useEditParam(entries, open)
+
+  const set = (k: keyof Draft, v: string) => {
+    setD((p) => ({ ...p, [k]: v }))
+    setServerErr((e) => ({ ...e, [k]: '' }))
+  }
+  const err = (k: keyof Draft) => {
+    if (tried && k === 'institution' && !d.institution.trim()) return 'Add the institution.'
+    if (tried && k === 'degree' && !d.degree.trim()) return 'Add the degree or qualification.'
+    return serverErr[k] || null
+  }
+
+  const save = useMutation({
+    mutationFn: (draft: Draft) => (editId === 'new' ? api.post('/education', toBody(draft)) : api.put(`/education/${editId}`, toBody(draft))),
+    onSuccess: (_r, draft) => {
+      qc.invalidateQueries({ queryKey: EDUCATION_KEY })
+      close()
+      say(`Saved ${draft.degree.trim()} at ${draft.institution.trim()}`)
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to create education entry')
-    }
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: EducationForm }) => api.put(`/education/${id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['education'] })
-      toast.success('Education entry updated successfully')
-      setIsModalOpen(false)
-      setEditingEducation(null)
-      reset()
-      setAchievements([])
+    onError: (e) => {
+      const mapped: Record<string, string> = {}
+      for (const [p, m] of Object.entries(fieldErrors(e))) if (PATH[p]) mapped[PATH[p]] = m
+      if (Object.keys(mapped).length) setServerErr(mapped)
+      else say(apiError(e))
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to update education entry')
-    }
   })
 
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/education/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['education'] })
-      toast.success('Education entry deleted successfully')
+      qc.invalidateQueries({ queryKey: EDUCATION_KEY })
+      setConfirming(false)
+      close()
+      say('Entry deleted')
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to delete education entry')
-    }
+    onError: (e) => {
+      setConfirming(false)
+      say(apiError(e, "Couldn't delete. Try again."))
+    },
   })
 
-  const onSubmit = (data: EducationForm) => {
-    const submitData = {
-      ...data,
-      achievements: achievements.filter(a => a.trim() !== '')
-    }
-    if (editingEducation) {
-      updateMutation.mutate({ id: editingEducation.id, data: submitData })
-    } else {
-      createMutation.mutate(submitData)
-    }
+  const submit = () => {
+    setTried(true)
+    if (!d.institution.trim() || !d.degree.trim()) return
+    save.mutate(d)
   }
 
-  const openModal = (edu?: Education) => {
-    if (edu) {
-      setEditingEducation(edu)
-      // Format dates for HTML date input
-      const formatDate = (dateStr: string | null | undefined) => {
-        if (!dateStr) return ''
-        try {
-          return new Date(dateStr).toISOString().split('T')[0]
-        } catch {
-          return ''
-        }
-      }
-      const eduAchievements = edu.achievements || []
-      setAchievements(eduAchievements.length > 0 ? [...eduAchievements] : [''])
-      reset({
-        institution: edu.institution,
-        degree: edu.degree,
-        field_of_study: edu.field_of_study || '',
-        location: edu.location || '',
-        start_date: formatDate(edu.start_date),
-        end_date: formatDate(edu.end_date),
-        grade: edu.grade || edu.gpa || '',
-        description: edu.description || '',
-        achievements: eduAchievements
-      })
-    } else {
-      setEditingEducation(null)
-      setAchievements([''])
-      reset({
-        institution: '',
-        degree: '',
-        field_of_study: '',
-        location: '',
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: null,
-        grade: '',
-        description: '',
-        achievements: []
-      })
-    }
-    setIsModalOpen(true)
-  }
+  const sorted = (entries || []).slice().sort((a, b) => ((a.start_date || '') < (b.start_date || '') ? 1 : -1))
+  const needle = q.trim().toLowerCase()
+  const shown = needle ? sorted.filter((e) => [e.degree, e.field_of_study, e.institution, e.location].join(' ').toLowerCase().includes(needle)) : sorted
+  const n = entries?.length ?? 0
 
-  const closeModal = () => {
-    setIsModalOpen(false)
-    setEditingEducation(null)
-    reset()
-    setAchievements([])
-  }
-
-  const addAchievement = () => {
-    setAchievements([...achievements, ''])
-  }
-
-  const removeAchievement = (index: number) => {
-    const newAchievements = achievements.filter((_, i) => i !== index)
-    setAchievements(newAchievements.length > 0 ? newAchievements : [''])
-  }
-
-  const updateAchievement = (index: number, value: string) => {
-    const newAchievements = [...achievements]
-    newAchievements[index] = value
-    setAchievements(newAchievements)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="spinner mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your education journey... 📚</p>
-        </div>
-      </div>
-    )
-  }
+  // Preview: the open draft (live), otherwise the newest entry.
+  const editing = editId !== null
+  const first = sorted[0]
+  const p = editing
+    ? { degree: d.degree || '[Degree]', field: d.field, institution: d.institution || '[Institution]', years: years(monthToApi(d.start), monthToApi(d.end)), description: d.description, grade: d.grade }
+    : first
+      ? { degree: first.degree, field: first.field_of_study || '', institution: first.institution, years: years(first.start_date, first.end_date), description: first.description || '', grade: first.grade ?? first.gpa ?? '' }
+      : { degree: '[Degree]', field: '', institution: '[Institution]', years: years(null, null), description: '', grade: '' }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <>
+      <div className="ad-head">
         <div>
-          <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>🎓 Education</h1>
-          <p className="mt-2 text-gray-600 font-medium">
-            Manage your educational background and achievements ✨
-          </p>
+          <h1 className="ad-title">Education</h1>
+          <p className="ad-sub">{entries ? `${plural(n, 'entry', 'entries')}. Shown on the Experience page and the CV.` : ' '}</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="btn-primary floating-hearts"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Education
+        <button type="button" className="btn btn-primary" onClick={() => open(null)}>
+          <Icon name="plus" size={16} />
+          Add education
         </button>
       </div>
 
-      {/* Education Grid */}
-      <div className="grid gap-6">
-        {education?.map((edu) => (
-          <div key={edu.id} className="card p-6 hover:scale-105 transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-r from-pink-100 to-purple-100 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-7 h-7 text-pink-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    {edu.degree}
-                    {edu.field_of_study && ` in ${edu.field_of_study}`}
-                  </h3>
-                  <p className="text-pink-600 font-semibold text-lg">{edu.institution}</p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openModal(edu)}
-                  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete this education entry? 💔')) {
-                      deleteMutation.mutate(edu.id)
-                    }
-                  }}
-                  className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-4 text-sm text-pink-600 mb-4">
-              {edu.location && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span className="font-medium">{edu.location}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span className="font-medium">
-                  {new Date(edu.start_date).toLocaleDateString()} - {edu.end_date ? new Date(edu.end_date).toLocaleDateString() : 'Present'}
-                </span>
-              </div>
-              {(edu.grade || edu.gpa) && (
-                <div className="px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 rounded-full text-sm font-semibold">
-                  🏆 {edu.grade || edu.gpa}
-                </div>
-              )}
-            </div>
-
-            {edu.description && (
-              <p className="text-gray-600 mb-4 font-medium">{edu.description}</p>
-            )}
-
-            {edu.achievements && edu.achievements.length > 0 && (
-              <div>
-                <h4 className="font-bold text-gray-800 mb-3" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  ✨ Achievements:
-                </h4>
-                <ul className="space-y-2">
-                  {edu.achievements.map((achievement, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <span className="text-pink-500 mt-1">•</span>
-                      <span className="text-gray-600 font-medium">{achievement}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      <div className="two">
+        <section className="card" aria-labelledby="ed-list-h">
+          <div className="card-head">
+            <h2 id="ed-list-h" className="card-title">Entries <span className="mute num" style={{ fontWeight: 400 }}>{n}</span></h2>
           </div>
-        ))}
-      </div>
-
-      {education?.length === 0 && (
-        <div className="text-center py-16">
-          <div className="w-20 h-20 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <GraduationCap className="w-10 h-10 text-pink-400" />
-          </div>
-          <p className="text-gray-500 text-xl font-semibold mb-2">No education entries found</p>
-          <p className="text-gray-400 font-medium">Click "Add Education" to create your first entry 🎓</p>
-        </div>
-      )}
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="modal-overlay fixed inset-0" onClick={closeModal}></div>
-            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="modal-header">
-                  <h3 className="text-xl font-bold">
-                    {editingEducation ? '✨ Edit Education' : '🎓 Add New Education'}
-                  </h3>
-                </div>
-                <div className="modal-body">
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="form-group">
-                        <label className="form-label">🏢 Institution *</label>
-                        <input
-                          {...register('institution', { required: 'Institution is required' })}
-                          type="text"
-                          className="form-input"
-                          placeholder="University of Excellence"
-                        />
-                        {errors.institution && <p className="text-red-500 text-sm mt-1">{errors.institution.message}</p>}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">🎓 Degree *</label>
-                        <input
-                          {...register('degree', { required: 'Degree is required' })}
-                          type="text"
-                          className="form-input"
-                          placeholder="Bachelor of Science"
-                        />
-                        {errors.degree && <p className="text-red-500 text-sm mt-1">{errors.degree.message}</p>}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">📚 Field of Study</label>
-                        <input
-                          {...register('field_of_study')}
-                          type="text"
-                          className="form-input"
-                          placeholder="Computer Science"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">📍 Location</label>
-                        <input
-                          {...register('location')}
-                          type="text"
-                          className="form-input"
-                          placeholder="New York, NY"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">📅 Start Date *</label>
-                        <input
-                          {...register('start_date', { required: 'Start date is required' })}
-                          type="date"
-                          className="form-input"
-                        />
-                        {errors.start_date && <p className="text-red-500 text-sm mt-1">{errors.start_date.message}</p>}
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">🏁 End Date</label>
-                        <input
-                          {...register('end_date')}
-                          type="date"
-                          className="form-input"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">🏆 Grade/GPA (max 10 characters)</label>
-                        <input
-                          {...register('grade', { 
-                            maxLength: {
-                              value: 10,
-                              message: 'Grade/GPA must be 10 characters or less'
-                            }
-                          })}
-                          type="text"
-                          className="form-input"
-                          placeholder="3.8 GPA"
-                          maxLength={10}
-                        />
-                        {errors.grade && <p className="text-red-500 text-sm mt-1">{errors.grade.message}</p>}
-                        <p className="text-xs text-gray-500 mt-1">Keep it short, e.g., "3.8 GPA" or "First Class"</p>
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">📝 Description</label>
-                      <textarea
-                        {...register('description')}
-                        rows={4}
-                        className="form-textarea"
-                        placeholder="Describe your educational experience, coursework, or highlights..."
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">🏆 Achievements</label>
-                      {achievements.map((achievement, index) => (
-                        <div key={index} className="flex gap-3 mb-3">
-                          <input
-                            type="text"
-                            value={achievement}
-                            onChange={(e) => updateAchievement(index, e.target.value)}
-                            className="form-input flex-1"
-                            placeholder="Dean's List, Summa Cum Laude, etc."
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeAchievement(index)}
-                            className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={addAchievement}
-                        className="text-pink-600 hover:text-pink-800 text-sm font-medium"
-                      >
-                        ✨ Add Achievement
-                      </button>
+          {isLoading ? (
+            <SkeletonRows thumb={false} />
+          ) : (
+            <ul className="rows" style={{ borderTop: '1px solid #f0eaf7' }}>
+              {shown.map((e) => (
+                <li key={e.id} className="row" style={{ gridTemplateColumns: GRID, minHeight: 80 }}>
+                  <div className="cell-id">
+                    <span className="mark" aria-hidden="true">{(e.institution.match(/[A-Z]/g) || ['?']).slice(0, 2).join('')}</span>
+                    <div>
+                      <p className="r1">{[e.degree, e.field_of_study].filter(Boolean).join(' ')}</p>
+                      <p className="r2">{[e.institution, e.location].filter(Boolean).join(' · ')}</p>
                     </div>
                   </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    className="btn-success"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? (
-                      <div className="flex items-center">
-                        <div className="spinner w-4 h-4 mr-2"></div>
-                        Saving...
-                      </div>
-                    ) : (
-                      editingEducation ? '✨ Update Education' : '🎓 Create Education'
-                    )}
-                  </button>
-                </div>
-              </form>
+                  <span className="num mute" style={{ fontSize: 13 }}>{years(e.start_date, e.end_date)}</span>
+                  <button type="button" className="btn btn-text right" onClick={() => open(e)} aria-label={`Edit ${e.degree} at ${e.institution}`}>Edit</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {needle && !isLoading && shown.length === 0 ? (
+            <p className="mute" style={{ padding: '12px 24px 0' }}>No education matches “{q.trim()}”.</p>
+          ) : null}
+          <div style={{ padding: '0 24px 20px' }}>
+            <div className="empty-slot" style={{ marginTop: 4 }}>
+              <span>A course, bootcamp or school you want on the CV goes here too.</span>
+              <button type="button" className="btn btn-text" onClick={() => open(null)}>Add one</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </section>
+
+        <section aria-labelledby="ed-prev-h" style={editing ? { position: 'relative', zIndex: 61 } : undefined}>
+          <h2 id="ed-prev-h" className="rail-h">How it reads on the site</h2>
+          <div className="card card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 6 }} data-testid="edu-preview">
+            <p className="mute" style={{ fontSize: 12 }}>Experience page and CV, {editing ? 'with your unsaved changes' : 'as it is now'}</p>
+            <p style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700, fontSize: 22, marginTop: 4 }}>Education</p>
+            <p className="b" style={{ fontSize: 15 }}>{[p.degree, p.field].filter(Boolean).join(' ')}</p>
+            <p style={{ fontSize: 14, color: '#5b21b6', fontWeight: 600 }}>{p.institution}, {p.years}</p>
+            {p.description ? <p style={{ fontSize: 14, lineHeight: 1.65, marginTop: 6 }}>{p.description}</p> : null}
+            {p.grade.trim() ? <p className="mute" style={{ fontSize: 13 }}>Grade: {p.grade}</p> : null}
+          </div>
+        </section>
+      </div>
+
+      {editing ? (
+        <Dialog
+          title={editId === 'new' ? 'Add education' : 'Edit education'}
+          sub="The preview beside the list updates as you type."
+          onClose={close}
+          saving={save.isPending}
+          onSubmit={submit}
+          footer={
+            <>
+              {editId !== 'new' ? <button type="button" className="btn btn-neg first" onClick={() => setConfirming(true)}>Delete entry</button> : null}
+              <button type="button" className="btn btn-line" onClick={close} disabled={save.isPending}>Cancel</button>
+              <SaveButton saving={save.isPending} label={editId === 'new' ? 'Add entry' : 'Save changes'} />
+            </>
+          }
+        >
+          <div className="form">
+            <Field label="Institution" error={err('institution')}>{(c) => <input {...c} value={d.institution} onChange={(e) => set('institution', e.target.value)} />}</Field>
+            <Field label="Degree or qualification" error={err('degree')}>{(c) => <input {...c} value={d.degree} onChange={(e) => set('degree', e.target.value)} />}</Field>
+            <Field label="Field of study" error={err('field')}>{(c) => <input {...c} value={d.field} onChange={(e) => set('field', e.target.value)} />}</Field>
+            <Field label="Location" error={err('location')}>{(c) => <input {...c} value={d.location} onChange={(e) => set('location', e.target.value)} />}</Field>
+            <Field label="Started" error={err('start')}>{(c) => <input {...c} type="month" value={d.start} onChange={(e) => set('start', e.target.value)} />}</Field>
+            <Field label="Finished" error={err('end')} hint="Leave empty if you are still studying.">{(c) => <input {...c} type="month" value={d.end} onChange={(e) => set('end', e.target.value)} />}</Field>
+            <Field label="Grade" error={err('grade')} hint={<span className="num">Up to 10 characters, like 2:1 or First. {10 - d.grade.length} left.</span>}>
+              {(c) => <input {...c} maxLength={10} value={d.grade} onChange={(e) => set('grade', e.target.value.slice(0, 10))} />}
+            </Field>
+            <span />
+            <Field label="Description" span2 error={err('description')}>{(c) => <textarea {...c} rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} />}</Field>
+            <Field label="Achievements" span2 error={err('achievements')} hint="One per line.">{(c) => <textarea {...c} rows={2} value={d.achievements} onChange={(e) => set('achievements', e.target.value)} />}</Field>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {confirming && typeof editId === 'number' ? (
+        <ConfirmDialog
+          title={`Delete ${d.degree} at ${d.institution}?`}
+          description="It comes off the Experience page and the CV. This can't be undone."
+          confirmLabel="Delete entry"
+          busy={remove.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => remove.mutate(editId)}
+        />
+      ) : null}
+    </>
   )
 }
-
-export default Education

@@ -1,0 +1,4 @@
+[
+  { "id": 1, "quote": "Demi is the developer every team hopes for.", "full_text": null, "name": "Adam Mellor", "role": "Engineering Manager", "company": "Cintra", "relationship": "managed Demi directly", "source": "LinkedIn", "source_url": null, "date": "2026-04-01", "show_on_cv": true, "sort_order": 0 },
+  { "id": 2, "quote": "Calm under pressure and kind in review.", "full_text": null, "name": "Priya Shah", "role": "Senior Engineer", "company": "Bright Labs", "relationship": "worked with Demi", "source": "LinkedIn", "source_url": null, "date": "2024-05-01", "show_on_cv": false, "sort_order": 10 }
+]

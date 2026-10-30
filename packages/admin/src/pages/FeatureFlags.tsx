@@ -1,364 +1,198 @@
-import React, { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
-import { Trash2, Edit, Plus, ToggleLeft, ToggleRight, Flag } from 'lucide-react'
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { apiError } from '@/lib/errors'
+import { FLAGS_KEY, KNOWN_FLAGS, flagLabel, isOn, useFlags, type FeatureFlag } from '@/lib/flags'
+import { useQ } from '@/hooks/useQ'
+import { useFlagToggle } from '@/components/useFlagToggle'
+import Dialog from '@/components/ui/Dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Switch from '@/components/ui/Switch'
+import Icon from '@/components/ui/Icon'
+import { SkeletonRows } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL 
-  ? `${(import.meta as any).env.VITE_API_URL}/api` 
-  : 'https://api.demitaylornimmo.com/api'
+export const KEY_RE = /^[a-z][a-z0-9_]{0,63}$/
+const KEY_HINT = 'Lower case letters, numbers and underscores, like show_reviews.'
 
-interface FeatureFlag {
-  id: number
-  name: string
-  description: string
-  enabled: boolean
-  created_at: string
-  updated_at: string
-}
+export default function FeatureFlags() {
+  const qc = useQueryClient()
+  const { say } = useToast()
+  const [q] = useQ()
+  const { data: flags, isLoading } = useFlags()
+  const { toggle, set, confirm } = useFlagToggle()
 
-interface FeatureFlagFormData {
-  name: string
-  description: string
-  enabled: boolean
-}
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [desc, setDesc] = useState('')
+  const [tried, setTried] = useState(false)
+  const [serverErr, setServerErr] = useState('')
+  const [deleting, setDeleting] = useState<FeatureFlag | null>(null)
 
-const FeatureFlags: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingFlag, setEditingFlag] = useState<FeatureFlag | null>(null)
-  const [featureFlags, setFeatureFlags] = useState<FeatureFlag[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const all = flags || []
+  const key = name.trim()
+  const taken = all.some((f) => f.name === key)
+  const keyErr = serverErr || (tried && taken ? `A flag called ${key} already exists.` : tried && !KEY_RE.test(key) ? KEY_HINT : '')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FeatureFlagFormData>()
+  const create = useMutation({
+    mutationFn: () => api.post('/feature-flags', { name: key, description: desc.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: FLAGS_KEY })
+      setAdding(false)
+      say(`Created ${key}, off`)
+    },
+    onError: (e) => setServerErr(apiError(e, "Couldn't create the flag. Try again.")),
+  })
 
-  // Fetch feature flags
-  const fetchFeatureFlags = async () => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE_URL}/feature-flags`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (!response.ok) throw new Error('Failed to fetch feature flags')
-      const data = await response.json()
-      setFeatureFlags(data.data)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const remove = useMutation({
+    mutationFn: (f: FeatureFlag) => api.delete(`/feature-flags/${f.id}`),
+    onSuccess: (_r, f) => {
+      qc.invalidateQueries({ queryKey: FLAGS_KEY })
+      setDeleting(null)
+      say(`Deleted ${f.name}`)
+    },
+    onError: (e) => {
+      setDeleting(null)
+      say(apiError(e, "Couldn't delete. Try again."))
+    },
+  })
 
-  useEffect(() => {
-    fetchFeatureFlags()
-  }, [])
-
-  // Create feature flag
-  const createFeatureFlag = async (flagData: FeatureFlagFormData) => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE_URL}/feature-flags`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(flagData)
-      })
-      if (!response.ok) throw new Error('Failed to create feature flag')
-      await fetchFeatureFlags()
-      setIsModalOpen(false)
-      reset()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create feature flag')
-    }
-  }
-
-  // Update feature flag
-  const updateFeatureFlag = async (id: number, flagData: FeatureFlagFormData) => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE_URL}/feature-flags/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(flagData)
-      })
-      if (!response.ok) throw new Error('Failed to update feature flag')
-      await fetchFeatureFlags()
-      setIsModalOpen(false)
-      setEditingFlag(null)
-      reset()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update feature flag')
-    }
-  }
-
-  // Delete feature flag
-  const deleteFeatureFlag = async (id: number) => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE_URL}/feature-flags/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      if (!response.ok) throw new Error('Failed to delete feature flag')
-      await fetchFeatureFlags()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete feature flag')
-    }
-  }
-
-  // Toggle feature flag
-  const toggleFeatureFlag = async (id: number, enabled: boolean) => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(`${API_BASE_URL}/feature-flags/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ enabled })
-      })
-      if (!response.ok) throw new Error('Failed to toggle feature flag')
-      await fetchFeatureFlags()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to toggle feature flag')
-    }
-  }
-
-  const onSubmit = (data: FeatureFlagFormData) => {
-    if (editingFlag) {
-      updateFeatureFlag(editingFlag.id, data)
-    } else {
-      createFeatureFlag(data)
-    }
-  }
-
-  const openModal = (flag?: FeatureFlag) => {
-    if (flag) {
-      setEditingFlag(flag)
-      reset({
-        name: flag.name,
-        description: flag.description,
-        enabled: flag.enabled
-      })
-    } else {
-      setEditingFlag(null)
-      reset({
-        name: '',
-        description: '',
-        enabled: false
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const handleToggle = (flag: FeatureFlag) => {
-    toggleFeatureFlag(flag.id, !flag.enabled)
-  }
-
-  const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this feature flag?')) {
-      deleteFeatureFlag(id)
-    }
-  }
-
-  if (isLoading) return (
-    <div className="flex justify-center items-center h-64">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
-    </div>
-  )
-  if (error) return (
-    <div className="card p-6 border-l-4 border-red-400 bg-red-50">
-      <div className="flex items-center">
-        <div className="text-red-600 font-medium">Error loading feature flags: {error}</div>
-      </div>
-    </div>
-  )
+  const maintenance = all.find((f) => f.name === 'maintenance_mode')
+  const maintenanceOn = !!maintenance?.enabled
+  const on = all.filter((f) => f.enabled).length
+  const needle = q.trim().toLowerCase()
+  const shown = needle ? all.filter((f) => [f.name, flagLabel(f.name), f.description].join(' ').toLowerCase().includes(needle)) : all
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-8">
+    <>
+      <div className="ad-head">
         <div>
-          <h1 className="text-4xl font-bold gradient-text flex items-center gap-3 mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-            <Flag className="w-10 h-10 text-pink-500" />
-            ✨ Feature Flags
-          </h1>
-          <p className="text-gray-600 text-lg font-medium">Manage application feature toggles with style! 💖</p>
+          <h1 className="ad-title">Feature flags</h1>
+          <p className="ad-sub">{flags ? `${all.length} flags, ${on} on. Each switches part of the live site.` : ' '}</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="btn-primary flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-        >
-          <Plus className="w-5 h-5" />
-          Add Feature Flag ✨
+        <button type="button" className="btn btn-primary" onClick={() => { setAdding(true); setName(''); setDesc(''); setTried(false); setServerErr('') }}>
+          <Icon name="plus" size={16} />
+          New flag
         </button>
       </div>
 
-      <div className="card overflow-hidden shadow-xl">
-        <table className="min-w-full divide-y divide-pink-100">
-          <thead className="bg-gradient-to-r from-pink-50 to-purple-50">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                🏷️ Name
-              </th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                📝 Description
-              </th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                ⚡ Status
-              </th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
-                📅 Updated
-              </th>
-              <th className="px-6 py-4 text-right text-sm font-bold text-gray-700 uppercase tracking-wider">
-                🔧 Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-pink-100">
-            {featureFlags.map((flag: FeatureFlag) => (
-              <tr key={flag.id} className="hover:bg-gradient-to-r hover:from-pink-25 hover:to-purple-25 transition-all duration-200">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>{flag.name}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-600 max-w-xs truncate font-medium">{flag.description}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <button
-                    onClick={() => handleToggle(flag)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 transform hover:scale-105 shadow-md ${
-                      flag.enabled
-                        ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white hover:from-green-500 hover:to-emerald-600'
-                        : 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-700 hover:from-gray-400 hover:to-gray-500'
-                    }`}
-                  >
-                    {flag.enabled ? (
-                      <>
-                        <ToggleRight className="w-4 h-4" />
-                        ✨ Enabled
-                      </>
-                    ) : (
-                      <>
-                        <ToggleLeft className="w-4 h-4" />
-                        💤 Disabled
-                      </>
-                    )}
-                  </button>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
-                  {new Date(flag.updated_at).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={() => openModal(flag)}
-                      className="text-pink-500 hover:text-pink-700 p-2 rounded-full hover:bg-pink-50 transition-all duration-200 transform hover:scale-110"
-                    >
-                      <Edit className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(flag.id)}
-                      className="text-red-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-all duration-200 transform hover:scale-110"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {maintenanceOn && maintenance ? (
+        <div className="notice" role="status">
+          <strong>Maintenance mode is on.</strong> Visitors see the maintenance page instead of the site.
+          <button type="button" className="btn btn-line" onClick={() => set(maintenance, false, 'Maintenance mode off. The site is live.')} style={{ marginLeft: 'auto', minHeight: 36 }}>Turn it off</button>
+        </div>
+      ) : null}
 
-        {featureFlags.length === 0 && (
-          <div className="text-center py-16">
-            <div className="mb-6">
-              <Flag className="w-16 h-16 text-pink-300 mx-auto mb-4" />
-              <div className="text-6xl mb-4">🎀</div>
+      <div className="rail">
+        <section className="card" aria-label="Flags">
+          {isLoading ? <SkeletonRows thumb={false} /> : (
+            <ul className="rows">
+              {shown.map((f) => {
+                const label = flagLabel(f.name)
+                const builtIn = f.name in KNOWN_FLAGS
+                return (
+                  <li key={f.id} style={{ padding: '16px 24px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <p style={{ fontSize: 15, fontWeight: 600 }}>{label}</p>
+                        <span className={'pill ' + (f.enabled ? (f.name === 'maintenance_mode' ? 'p-draft' : 'p-live') : 'p-off')}>{f.enabled ? 'On' : 'Off'}</span>
+                      </div>
+                      {f.description ? <p className="mute" style={{ fontSize: 14 }}>{f.description}</p> : null}
+                      <p className="mono mute" style={{ fontSize: 12 }}>{f.name}</p>
+                      {!builtIn ? (
+                        <button type="button" className="btn btn-text" style={{ alignSelf: 'flex-start', minHeight: 32, padding: '0 8px', marginLeft: -8, color: '#b4235a' }} onClick={() => setDeleting(f)} aria-label={`Delete ${f.name}`}>Delete</button>
+                      ) : null}
+                    </div>
+                    <Switch checked={f.enabled} onChange={() => toggle(f)} aria-label={label} style={{ width: 'auto' }} />
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {!isLoading && shown.length === 0 ? <p className="mute" style={{ padding: '16px 24px' }}>{needle ? `No flags match “${q.trim()}”.` : 'No flags yet.'}</p> : null}
+        </section>
+
+        <section aria-labelledby="fl-prev-h">
+          <h2 id="fl-prev-h" className="rail-h">What visitors see now</h2>
+          <div className="card card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <p className="mute" style={{ fontSize: 12 }}>Home page</p>
+              {maintenanceOn ? (
+                <div className="panel" style={{ marginTop: 6 }}>
+                  <p className="b">Back soon</p>
+                  <p className="mute" style={{ fontSize: 13 }}>The maintenance page replaces every page of the site.</p>
+                </div>
+              ) : (
+                <div className="panel" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: 26, color: '#5b21b6', lineHeight: 1 }}>Demi Taylor Nimmo</span>
+                  {isOn(flags, 'open_to_work') ? <span className="pill p-live"><span className="dot" />Open to work</span> : null}
+                </div>
+              )}
             </div>
-            <h3 className="text-2xl font-bold gradient-text mb-3" style={{ fontFamily: 'Playfair Display, serif' }}>No feature flags yet</h3>
-            <p className="text-gray-600 mb-6 text-lg font-medium">Create your first feature flag to get started! ✨</p>
-            <button
-              onClick={() => openModal()}
-              className="btn-primary shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-            >
-              Add Feature Flag 💖
-            </button>
+            <div>
+              <p className="mute" style={{ fontSize: 12 }}>Privacy and Terms pages, apps covered</p>
+              <p style={{ marginTop: 6, fontSize: 14 }}>{isOn(flags, 'show_marbl') ? 'This site, the listed apps and Marbl.' : 'This site and the listed apps. Marbl is left out.'}</p>
+            </div>
           </div>
-        )}
+        </section>
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-pink-600 bg-opacity-30 backdrop-blur-sm overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-8 w-[500px] bg-white rounded-3xl shadow-2xl border border-pink-200">
-            <div className="mb-6">
-              <h3 className="text-2xl font-bold gradient-text mb-2" style={{ fontFamily: 'Playfair Display, serif' }}>
-                {editingFlag ? '✨ Edit Feature Flag' : '🎀 Add New Feature Flag'}
-              </h3>
-              <p className="text-gray-600 font-medium">Configure your feature toggle with style! 💖</p>
+      {confirm}
+
+      {adding ? (
+        <Dialog
+          title="New flag"
+          sub="New flags start off. Read one in the site with its key."
+          maxWidth={520}
+          onClose={() => setAdding(false)}
+          saving={create.isPending}
+          onSubmit={() => {
+            setTried(true)
+            setServerErr('')
+            if (!KEY_RE.test(key) || taken) return
+            create.mutate()
+          }}
+          footer={
+            <>
+              <button type="button" className="btn btn-line" onClick={() => setAdding(false)} disabled={create.isPending}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={create.isPending}>{create.isPending ? <><span className="spin" aria-hidden="true" />Saving</> : 'Create flag'}</button>
+            </>
+          }
+        >
+          <div className="form" style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+            <div className="field">
+              <label htmlFor="fl-key">Key</label>
+              <input
+                id="fl-key"
+                className={'input mono' + (keyErr ? ' err' : '')}
+                maxLength={64}
+                value={name}
+                onChange={(e) => { setName(e.target.value); setServerErr('') }}
+                aria-invalid={!!keyErr}
+                aria-describedby="fl-key-h"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <span id="fl-key-h" className={keyErr ? 'err-text' : 'hint'}>{keyErr || KEY_HINT}</span>
             </div>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">🏷️ Name</label>
-                <input
-                  {...register('name', { required: 'Name is required' })}
-                  className="input-girly w-full"
-                  placeholder="feature_name"
-                />
-                {errors.name && <p className="text-red-500 text-sm mt-2 font-medium">💔 {errors.name.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">📝 Description</label>
-                <textarea
-                  {...register('description')}
-                  className="input-girly w-full resize-none"
-                  rows={4}
-                  placeholder="Description of what this feature flag controls..."
-                />
-              </div>
-
-              <div className="flex items-center p-4 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    {...register('enabled')}
-                    className="w-5 h-5 rounded border-2 border-pink-300 text-pink-500 focus:ring-pink-200 focus:ring-2"
-                  />
-                  <span className="ml-3 text-sm font-bold text-gray-700">⚡ Enable this feature flag</span>
-                </label>
-              </div>
-
-              <div className="flex justify-end space-x-4 pt-6 border-t border-pink-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-all duration-300 transform hover:scale-105"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
-                >
-                  {editingFlag ? '💖 Update Flag' : '✨ Create Flag'}
-                </button>
-              </div>
-            </form>
+            <div className="field">
+              <label htmlFor="fl-desc">What it controls</label>
+              <textarea id="fl-desc" className="input" rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} />
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        </Dialog>
+      ) : null}
+
+      {deleting ? (
+        <ConfirmDialog
+          title={`Delete ${deleting.name}?`}
+          description={`Anything on the site that reads ${deleting.name} treats it as off. This can't be undone.`}
+          confirmLabel="Delete flag"
+          busy={remove.isPending}
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => remove.mutate(deleting)}
+        />
+      ) : null}
+    </>
   )
 }
-
-export default FeatureFlags

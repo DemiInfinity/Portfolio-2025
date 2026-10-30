@@ -1,0 +1,56 @@
+/* Generated CV (CV-1, CV-2). Two A4 sheets on a grey page; prints to A4. */
+.cv-page { min-height: 100vh; background: #ece8f2; padding: 40px 16px; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+.cv { width: 794px; max-width: 100%; min-height: 1123px; background: #fff; color: #1f1a2e; font-family: var(--f-sans); position: relative; display: flex; flex-direction: column; box-shadow: 0 30px 60px -40px rgba(46, 16, 101, .5); }
+.cv *, .cv *::before, .cv *::after { box-sizing: border-box; }
+.cv h1, .cv h2, .cv h3, .cv p, .cv ul, .cv dl, .cv dd { margin: 0; }
+.cv a { color: #5b21b6; text-decoration: none; }
+.cv-bar { height: 8px; background: linear-gradient(90deg, #f472b6, #7c3aed); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cv-body { padding: 44px 60px 40px; display: flex; flex-direction: column; gap: 22px; flex: 1; }
+.cv-sheet-2 .cv-body { padding-top: 36px; }
+.cv h1 { font-family: var(--f-serif); font-weight: 700; font-size: 36px; line-height: 1.05; color: #2e1065; }
+.cv h2 { font-family: var(--f-serif); font-weight: 700; font-size: 19px; color: #2e1065; display: flex; align-items: center; gap: 10px; }
+.cv h2::after { content: ""; flex: 1; height: 1px; background: #ddd0f5; }
+.cv section { display: flex; flex-direction: column; gap: 10px; }
+.cv-contact { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; padding: 12px 16px; border-radius: 12px; background: #f7f2ff; list-style: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cv-contact strong { font-weight: 600; }
+.cv .role { display: flex; flex-direction: column; gap: 5px; }
+.cv .role-top, .cv .proj-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.cv .role-top h3 { font-size: 14.5px; font-weight: 600; color: #1f1a2e; }
+.cv .proj-top h3 { font-size: 14px; font-weight: 600; }
+.cv .when { font-size: 12.5px; font-weight: 500; color: #5b21b6; white-space: nowrap; }
+.cv .where { font-size: 12.5px; color: #5a5068; }
+.cv ul { padding-left: 17px; display: flex; flex-direction: column; gap: 3px; }
+.cv li { font-size: 13px; line-height: 1.5; }
+.cv li::marker { color: #a78bfa; }
+.cv .sk { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 16px; font-size: 13px; line-height: 1.5; }
+.cv .sk dt { font-weight: 600; color: #5b21b6; }
+.cv .proj { display: flex; flex-direction: column; gap: 3px; }
+.cv .stack { font-size: 12px; color: #5a5068; white-space: nowrap; }
+.cv .body { font-size: 13px; line-height: 1.5; }
+.cv .profile { font-size: 13.5px; line-height: 1.6; }
+.cv blockquote { margin: 0; padding: 14px 18px; border-left: 3px solid #a78bfa; background: #f7f2ff; border-radius: 0 12px 12px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cv-foot { padding: 0 60px 28px; display: flex; justify-content: space-between; font-size: 12px; color: #5a5068; }
+@media (max-width: 820px) {
+  .cv { min-height: 0; }
+  .cv-body { padding: 32px 24px; }
+  .cv-foot { padding: 0 24px 24px; }
+  .cv .sk { grid-template-columns: minmax(0, 1fr); }
+  .cv .role-top, .cv .proj-top { flex-wrap: wrap; }
+  .cv .stack { white-space: normal; }
+}
+
+@page {
+  size: A4;
+  margin: 0 0 12mm 0;
+  @bottom-left { content: "Phone available on request"; font-family: Poppins, Arial, sans-serif; font-size: 9pt; color: #5a5068; padding-left: 16mm; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: Poppins, Arial, sans-serif; font-size: 9pt; color: #5a5068; padding-right: 16mm; }
+}
+@media print {
+  html, body { background: #fff !important; }
+  .cv-page { padding: 0; background: #fff; gap: 0; display: block; }
+  .cv { width: auto; min-height: 0; box-shadow: none; max-width: none; }
+  .cv-sheet-2 { break-before: page; }
+  /* The @page margin boxes carry the footer and the real page count. */
+  .cv-foot { display: none; }
+  .cv section, .cv .role, .cv .proj { break-inside: avoid; }
+}

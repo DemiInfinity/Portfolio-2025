@@ -11,14 +11,15 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  let error = { ...err }
+  const error = { ...err }
   error.message = err.message
 
   // Log error
   console.error(err)
 
   // Default error
-  let statusCode = error.statusCode || 500
+  // notFound sets res.status(404) before passing the error on; keep any 4xx already set.
+  let statusCode = error.statusCode || (res.statusCode >= 400 && res.statusCode < 500 ? res.statusCode : 500)
   let message = error.message || 'Internal Server Error'
 
   // Mongoose bad ObjectId

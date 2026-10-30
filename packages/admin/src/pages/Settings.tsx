@@ -1,410 +1,245 @@
-import { useState, useEffect, useRef } from 'react'
-import { useForm } from 'react-hook-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '@/hooks/useAuth'
+import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { User, Lock, Save, FileText, Upload, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { useAuth } from '@/hooks/useAuth'
+import { apiError } from '@/lib/errors'
+import { API_ORIGIN, SITE_URL, hostOf } from '@/lib/config'
+import { isBuilding, rebuiltLabel, useCvStatus, useRegenerateCv } from '@/lib/cv'
+import { EMAIL_RE } from '@/lib/validation'
+import Icon from '@/components/ui/Icon'
+import { useToast } from '@/components/ui/Toast'
 
-interface ProfileForm {
-  name: string
-  email: string
-}
+const MIN = 6
 
-interface PasswordForm {
-  currentPassword: string
-  newPassword: string
-  confirmPassword: string
-}
+export const RESUME_KEY = ['resume'] as const
 
-const Settings = () => {
-  const { user, refreshUser, loading } = useAuth()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
-  const resumeInputRef = useRef<HTMLInputElement>(null)
-  const [uploadingResume, setUploadingResume] = useState(false)
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login')
-    }
-  }, [user, loading, navigate])
-
-  const { register: registerProfile, handleSubmit: handleProfileSubmit, reset: resetProfile, formState: { errors: profileErrors } } = useForm<ProfileForm>({
-    defaultValues: {
-      name: '',
-      email: ''
-    }
+export default function Settings() {
+  const { user, refreshUser } = useAuth()
+  const { say } = useToast()
+  const cv = useCvStatus()
+  const regen = useRegenerateCv(say)
+  const resume = useQuery({
+    queryKey: RESUME_KEY,
+    queryFn: async () => (await api.get('/upload/resume')).data as { available: boolean; url: string | null },
+    retry: false,
   })
 
-  // Reset form when user changes (e.g., after logout/login)
-  useEffect(() => {
-    if (user) {
-      resetProfile({
-        name: user.name || '',
-        email: user.email || ''
-      })
-    } else {
-      resetProfile({
-        name: '',
-        email: ''
-      })
-    }
-  }, [user, resetProfile])
-
-  const { data: resumeStatus } = useQuery({
-    queryKey: ['resume-status'],
-    queryFn: async () => {
-      const res = await api.get('/upload/resume')
-      return res.data as { available: boolean; url: string | null; path?: string }
-    }
-  })
-
-  const deleteResumeMutation = useMutation({
-    mutationFn: () => api.delete('/upload/object', { data: { path: resumeStatus?.path } }),
-    onSuccess: () => {
-      toast.success('Resume removed')
-      queryClient.invalidateQueries({ queryKey: ['resume-status'] })
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Failed to remove resume')
-    }
-  })
-
-  const handleResumeFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.type !== 'application/pdf') {
-      toast.error('Please choose a PDF file')
-      e.target.value = ''
-      return
-    }
-    setUploadingResume(true)
-    try {
-      const formData = new FormData()
-      formData.append('resume', file)
-      await api.post('/upload/resume', formData)
-      toast.success('Resume uploaded')
-      queryClient.invalidateQueries({ queryKey: ['resume-status'] })
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to upload resume')
-    } finally {
-      setUploadingResume(false)
-      e.target.value = ''
-    }
-  }
-
-  // Don't render if not authenticated
-  if (loading || !user) {
-    return null
-  }
-
-  const { register: registerPassword, handleSubmit: handlePasswordSubmit, reset: resetPassword, watch, formState: { errors: passwordErrors } } = useForm<PasswordForm>()
-
-  const updateProfileMutation = useMutation({
-    mutationFn: (data: ProfileForm) => api.put('/auth/profile', data),
+  // Profile
+  const [name, setName] = useState(user?.name || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [emailTried, setEmailTried] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
+  const emailBad = emailTried && !EMAIL_RE.test(email)
+  const profile = useMutation({
+    mutationFn: () => api.put('/auth/profile', { name: name.trim(), email: email.trim() }),
     onSuccess: async () => {
-      toast.success('Profile updated successfully')
-      // Refresh user data
       await refreshUser()
+      setProfileSaved(true)
+      setEmailTried(false)
+      say('Profile saved')
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.error || 'Failed to update profile'
-      toast.error(message)
-    }
+    onError: (e) => say(apiError(e)),
   })
+  const saveProfile = (e: FormEvent) => {
+    e.preventDefault()
+    if (!EMAIL_RE.test(email)) return setEmailTried(true)
+    profile.mutate()
+  }
 
-  const changePasswordMutation = useMutation({
-    mutationFn: (data: { currentPassword: string, newPassword: string }) => api.put('/auth/change-password', data),
+  // Password
+  const [cur, setCur] = useState('')
+  const [nw, setNw] = useState('')
+  const [conf, setConf] = useState('')
+  const [pwTried, setPwTried] = useState(false)
+  const [pwSaved, setPwSaved] = useState(false)
+  const [curWrong, setCurWrong] = useState(false)
+  const curErr = curWrong ? 'Your current password is wrong.' : pwTried && !cur ? 'Enter your current password.' : null
+  const newBad = pwTried && nw.length < MIN
+  const confBad = pwTried && conf !== nw
+  const left = MIN - nw.length
+  const password = useMutation({
+    mutationFn: () => api.put('/auth/change-password', { currentPassword: cur, newPassword: nw }),
     onSuccess: () => {
-      toast.success('Password changed successfully')
-      resetPassword()
+      setCur('')
+      setNw('')
+      setConf('')
+      setPwTried(false)
+      setPwSaved(true)
+      say('Password changed')
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.error || 'Failed to change password'
-      toast.error(message)
-    }
+    onError: (e) => {
+      const msg = apiError(e, '')
+      // H-8 point 3: a wrong current password is a 400 (not a 401), so the session stays.
+      if (/current password/i.test(msg)) setCurWrong(true)
+      else say(msg || "Couldn't change the password. Try again.")
+    },
   })
-
-  const onProfileSubmit = (data: ProfileForm) => {
-    updateProfileMutation.mutate(data)
+  const savePw = (e: FormEvent) => {
+    e.preventDefault()
+    setCurWrong(false)
+    if (!cur || nw.length < MIN || conf !== nw) return setPwTried(true)
+    password.mutate()
   }
 
-  const onPasswordSubmit = (data: PasswordForm) => {
-    if (data.newPassword !== data.confirmPassword) {
-      toast.error('New passwords do not match')
-      return
-    }
-    changePasswordMutation.mutate({
-      currentPassword: data.currentPassword,
-      newPassword: data.newPassword
-    })
-  }
-
-  const watchNewPassword = watch('newPassword')
+  // CV
+  const s = cv.data
+  const building = regen.isPending || isBuilding(s)
+  const neverBuilt = !!s && !s.generatedAt && s.state !== 'failed'
+  const sub = !s
+    ? cv.isLoading ? ' ' : 'Your CV PDF status is not available yet.'
+    : s.state === 'failed'
+      ? 'The last CV build failed. Visitors get the previous PDF.'
+      : s.generatedAt
+        ? 'Your CV PDF is live behind the Download CV button.'
+        : 'No CV PDF yet, so the Download CV button is hidden on the site.'
+  const kb = s?.size ? `${Math.round(s.size / 1024)} KB` : ''
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="ad-head">
+        <div>
+          <h1 className="ad-title">Settings</h1>
+          <p className="ad-sub">{sub}</p>
+        </div>
+      </div>
+
       <div>
-        <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>⚙️ Settings</h1>
-        <p className="mt-2 text-gray-600 font-medium">
-          Manage your account settings and preferences ✨
-        </p>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b-2 border-gradient-to-r from-pink-200 to-purple-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('profile')}
-            className={`py-3 px-4 border-b-2 font-bold text-sm rounded-t-lg transition-all duration-300 ${
-              activeTab === 'profile'
-                ? 'border-pink-500 text-pink-600 bg-gradient-to-r from-pink-50 to-purple-50'
-                : 'border-transparent text-gray-500 hover:text-pink-600 hover:border-pink-300 hover:bg-pink-50'
-            }`}
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            <User className="w-5 h-5 inline mr-2" />
-            👤 Profile
-          </button>
-          <button
-            onClick={() => setActiveTab('password')}
-            className={`py-3 px-4 border-b-2 font-bold text-sm rounded-t-lg transition-all duration-300 ${
-              activeTab === 'password'
-                ? 'border-pink-500 text-pink-600 bg-gradient-to-r from-pink-50 to-purple-50'
-                : 'border-transparent text-gray-500 hover:text-pink-600 hover:border-pink-300 hover:bg-pink-50'
-            }`}
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            <Lock className="w-5 h-5 inline mr-2" />
-            🔒 Password
-          </button>
-        </nav>
-      </div>
-
-      {/* Profile Tab */}
-      {activeTab === 'profile' && (
-        <div className="card p-6">
-          <form onSubmit={handleProfileSubmit(onProfileSubmit)}>
-            <div>
-              <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-                👤 Profile Information
-              </h3>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    ✨ Full Name
-                  </label>
-                  <input
-                    {...registerProfile('name', { required: 'Name is required' })}
-                    type="text"
-                    className="form-input"
-                  />
-                  {profileErrors.name && (
-                    <p className="mt-1 text-sm text-red-600">{profileErrors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    📧 Email Address
-                  </label>
-                  <input
-                    {...registerProfile('email', { 
-                      required: 'Email is required',
-                      pattern: {
-                        value: /^\S+@\S+$/i,
-                        message: 'Invalid email address'
-                      }
-                    })}
-                    type="email"
-                    className="form-input"
-                  />
-                  {profileErrors.email && (
-                    <p className="mt-1 text-sm text-red-600">{profileErrors.email.message}</p>
-                  )}
-                </div>
+        <section className="set" aria-labelledby="st-cv-t">
+          <div>
+            <h2 id="st-cv-t" className="set-t">CV for download</h2>
+            <p className="set-d">A PDF built from your content, behind the Download CV button on the home and About pages. It rebuilds itself a few seconds after you change something.</p>
+            <div style={{ marginTop: 16 }}>
+              <p className="mute" style={{ fontSize: 12 }}>On the site now</p>
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span className="btn btn-primary" aria-hidden="true" style={{ cursor: 'default' }}>Hire me</span>
+                {resume.data?.available ? (
+                  <span className="btn btn-line" aria-hidden="true" style={{ cursor: 'default' }}>Download CV</span>
+                ) : (
+                  <span className="empty-slot" style={{ padding: '10px 14px', fontSize: 13 }}>Download CV hidden</span>
+                )}
               </div>
             </div>
-            <div className="bg-gradient-to-r from-pink-50 to-purple-50 px-6 py-4 rounded-b-xl text-right">
-              <button
-                type="submit"
-                disabled={updateProfileMutation.isPending}
-                className="btn-success floating-hearts"
-              >
-                <Save className="w-5 h-5 mr-2" />
-                {updateProfileMutation.isPending ? '💾 Saving...' : '💾 Save Changes'}
-              </button>
+          </div>
+          <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {s?.state === 'failed' && !regen.isPending ? (
+              <div className="notice">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p>The last rebuild failed. Visitors still get the previous PDF.</p>
+                  {s.error ? <p className="sm">{s.error}</p> : null}
+                </div>
+                <button type="button" className="btn btn-line" onClick={() => regen.mutate()} style={{ minHeight: 36 }}>Try again</button>
+              </div>
+            ) : null}
+            {!s && !cv.isLoading ? <p className="mute" style={{ fontSize: 13 }}>CV build status isn't available yet.</p> : null}
+            {neverBuilt ? (
+              <div className="empty-slot" style={{ background: '#fff', padding: 20 }}>
+                <div>
+                  <p style={{ color: '#241b33', fontWeight: 600 }}>No CV PDF yet</p>
+                  {building ? (
+                    <p id="st-build-why" style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="spin" aria-hidden="true" style={{ borderColor: '#d9cfe6', borderTopColor: '#615a6c', width: 12, height: 12 }} />
+                      Rebuilding with your latest changes
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: 13 }}>It builds a few seconds after your next change, or now.</p>
+                  )}
+                </div>
+                <button type="button" className="btn btn-line" onClick={() => regen.mutate()} disabled={building} aria-describedby={building ? 'st-build-why' : undefined}>Build it now</button>
+              </div>
+            ) : null}
+            {s && s.generatedAt ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', background: '#fff', border: '1px solid #ece4f5', borderRadius: 14, padding: '14px 16px' }} data-testid="cv-card">
+                <span className="mark" aria-hidden="true" style={{ borderRadius: 10, background: '#f3e8ff' }}><Icon name="file" size={20} /></span>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <p className="b">Demi-Taylor-Nimmo-CV.pdf</p>
+                  {building ? (
+                    <p className="mute" style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="spin" aria-hidden="true" style={{ borderColor: '#d9cfe6', borderTopColor: '#615a6c', width: 12, height: 12 }} />
+                      Rebuilding with your latest changes
+                    </p>
+                  ) : (
+                    <p className="mute num" style={{ fontSize: 13 }}>Rebuilt {rebuiltLabel(s.generatedAt!)}{kb ? ` · ${kb}` : ''}</p>
+                  )}
+                </div>
+                {s.pdfUrl ? <a className="btn btn-text" href={s.pdfUrl} target="_blank" rel="noopener noreferrer">Download</a> : null}
+                <button type="button" className="btn btn-line" onClick={() => regen.mutate()} disabled={building}>Regenerate</button>
+              </div>
+            ) : null}
+            <p className="mute" style={{ fontSize: 13 }}>
+              The <a href={`${SITE_URL}/cv`} target="_blank" rel="noopener noreferrer" style={{ color: '#4c1d95', fontWeight: 500 }}>generated CV</a> is the live page. This PDF is the file visitors download.
+            </p>
+          </div>
+        </section>
+
+        <section className="set" aria-labelledby="st-pr-t">
+          <div>
+            <h2 id="st-pr-t" className="set-t">Profile</h2>
+            <p className="set-d">The name in the admin sidebar and the email you sign in with.</p>
+          </div>
+          <form className="panel" onSubmit={saveProfile} noValidate>
+            <div className="pfields">
+              <div className="field">
+                <label htmlFor="st-name">Name</label>
+                <input id="st-name" className="input" value={name} onChange={(e) => { setName(e.target.value); setProfileSaved(false) }} autoComplete="name" />
+              </div>
+              <div className="field">
+                <label htmlFor="st-email">Email</label>
+                <input id="st-email" className={'input' + (emailBad ? ' err' : '')} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setProfileSaved(false) }} autoComplete="email" aria-invalid={emailBad} aria-describedby="st-em-h" />
+                <span id="st-em-h" className={emailBad ? 'err-text' : 'hint'}>{emailBad ? 'Enter a full email address, like name@example.com.' : 'Changing it changes how you sign in.'}</span>
+              </div>
+            </div>
+            <div className="pfoot">
+              {profileSaved ? <span className="mute" style={{ fontSize: 13 }}>Saved</span> : null}
+              <button type="submit" className="btn btn-primary" disabled={profile.isPending}>{profile.isPending ? <><span className="spin" aria-hidden="true" />Saving</> : 'Save profile'}</button>
             </div>
           </form>
-        </div>
-      )}
+        </section>
 
-      {/* Password Tab */}
-      {activeTab === 'password' && (
-        <div className="card p-6">
-          <form onSubmit={handlePasswordSubmit(onPasswordSubmit)}>
-            <div>
-              <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-                🔒 Change Password
-              </h3>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    🔐 Current Password
-                  </label>
-                  <input
-                    {...registerPassword('currentPassword', { 
-                      required: 'Current password is required',
-                      minLength: {
-                        value: 6,
-                        message: 'Password must be at least 6 characters'
-                      }
-                    })}
-                    type="password"
-                    className="form-input"
-                  />
-                  {passwordErrors.currentPassword && (
-                    <p className="mt-1 text-sm text-red-600">{passwordErrors.currentPassword.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    🆕 New Password
-                  </label>
-                  <input
-                    {...registerPassword('newPassword', { 
-                      required: 'New password is required',
-                      minLength: {
-                        value: 6,
-                        message: 'Password must be at least 6 characters'
-                      }
-                    })}
-                    type="password"
-                    className="form-input"
-                  />
-                  {passwordErrors.newPassword && (
-                    <p className="mt-1 text-sm text-red-600">{passwordErrors.newPassword.message}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                    ✅ Confirm New Password
-                  </label>
-                  <input
-                    {...registerPassword('confirmPassword', { 
-                      required: 'Please confirm your new password',
-                      validate: value => value === watchNewPassword || 'Passwords do not match'
-                    })}
-                    type="password"
-                    className="form-input"
-                  />
-                  {passwordErrors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{passwordErrors.confirmPassword.message}</p>
-                  )}
-                </div>
+        <section className="set" aria-labelledby="st-pw-t">
+          <div>
+            <h2 id="st-pw-t" className="set-t">Password</h2>
+            <p className="set-d">You stay signed in here after changing it.</p>
+          </div>
+          <form className="panel" onSubmit={savePw} noValidate>
+            <div className="pfields">
+              <div className="field">
+                <label htmlFor="st-cur">Current password</label>
+                <input id="st-cur" className={'input' + (curErr ? ' err' : '')} type="password" value={cur} onChange={(e) => { setCur(e.target.value); setPwSaved(false); setCurWrong(false) }} autoComplete="current-password" aria-invalid={!!curErr} aria-describedby={curErr ? 'st-cur-m' : undefined} />
+                {curErr ? <span id="st-cur-m" className="err-text">{curErr}</span> : null}
+              </div>
+              <div className="field">
+                <label htmlFor="st-new">New password</label>
+                <input id="st-new" className={'input' + (newBad ? ' err' : '')} type="password" value={nw} onChange={(e) => { setNw(e.target.value); setPwSaved(false) }} autoComplete="new-password" aria-invalid={newBad} aria-describedby="st-new-h" />
+                <span id="st-new-h" className={newBad ? 'err-text' : 'hint'}>{left > 0 ? `At least ${MIN} characters. ${left} to go.` : 'Long enough.'}</span>
+              </div>
+              <div className="field">
+                <label htmlFor="st-conf">Confirm new password</label>
+                <input id="st-conf" className={'input' + (confBad ? ' err' : '')} type="password" value={conf} onChange={(e) => { setConf(e.target.value); setPwSaved(false) }} autoComplete="new-password" aria-invalid={confBad} aria-describedby={confBad ? 'st-conf-m' : undefined} />
+                {confBad ? <span id="st-conf-m" className="err-text">This doesn't match the new password.</span> : null}
               </div>
             </div>
-            <div className="bg-gradient-to-r from-pink-50 to-purple-50 px-6 py-4 rounded-b-xl text-right">
-              <button
-                type="submit"
-                disabled={changePasswordMutation.isPending}
-                className="btn-success floating-hearts"
-              >
-                <Lock className="w-5 h-5 mr-2" />
-                {changePasswordMutation.isPending ? '🔄 Changing...' : '🔒 Change Password'}
-              </button>
+            <div className="pfoot">
+              {pwSaved ? <span className="mute" style={{ fontSize: 13 }}>Password changed</span> : null}
+              <button type="submit" className="btn btn-line" disabled={password.isPending}>{password.isPending ? 'Saving' : 'Change password'}</button>
             </div>
           </form>
-        </div>
-      )}
+        </section>
 
-      {/* Resume / CV */}
-      <div className="card p-6">
-        <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          📄 Resume / CV
-        </h3>
-        <p className="text-sm text-gray-600 font-medium mb-4">
-          Upload a PDF to show the "Download CV" button on the site. Re-uploading replaces the current file at the same link; removing it hides the button again.
-        </p>
-        {resumeStatus?.available ? (
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl mb-4">
-            <div className="flex items-center gap-3">
-              <FileText className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="text-sm font-bold text-gray-800">Resume uploaded</p>
-                <a href={resumeStatus.url ?? '#'} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-600 hover:underline font-medium">
-                  View current file
-                </a>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => deleteResumeMutation.mutate()}
-              disabled={deleteResumeMutation.isPending}
-              className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-lg border-2 border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors disabled:opacity-60"
-            >
-              <Trash2 className="w-4 h-4" />
-              Remove
-            </button>
+        <section className="set" aria-labelledby="st-sys-t">
+          <div>
+            <h2 id="st-sys-t" className="set-t">Account and connections</h2>
+            <p className="set-d">Where this admin reads and writes. Set at deploy time.</p>
           </div>
-        ) : (
-          <div className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl mb-4">
-            <p className="text-sm font-medium text-gray-600">No resume uploaded yet - the Download CV button is hidden on the site.</p>
+          <div className="panel">
+            <dl className="kv">
+              <dt className="mute">Role</dt><dd className="right">{user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Admin'}</dd>
+              <dt className="mute">Account</dt><dd className="right"><span className="pill p-live"><span className="dot" />Active</span></dd>
+              <dt className="mute">Site</dt><dd className="right"><a href={SITE_URL} target="_blank" rel="noopener noreferrer" style={{ color: '#4c1d95', textDecoration: 'none', fontWeight: 500 }}>{hostOf(SITE_URL)}</a></dd>
+              <dt className="mute">API</dt><dd className="right mono">{hostOf(API_ORIGIN)}</dd>
+            </dl>
           </div>
-        )}
-        <input ref={resumeInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleResumeFileChange} />
-        <button
-          type="button"
-          disabled={uploadingResume}
-          onClick={() => resumeInputRef.current?.click()}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border-2 border-pink-200 bg-white text-pink-700 hover:bg-pink-50 transition-colors disabled:opacity-60"
-        >
-          <Upload className="w-4 h-4" />
-          {uploadingResume ? 'Uploading…' : resumeStatus?.available ? 'Replace resume' : 'Upload resume'}
-        </button>
+        </section>
       </div>
-
-      {/* System Information */}
-      <div className="card p-6">
-        <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          💻 System Information
-        </h3>
-          <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
-              <dt className="text-sm font-bold text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>👑 User Role</dt>
-              <dd className="mt-2 text-sm font-medium text-gray-800">{user?.role}</dd>
-            </div>
-            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl">
-              <dt className="text-sm font-bold text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>✅ Account Status</dt>
-              <dd className="mt-2">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-200 text-green-800">
-                  🟢 Active
-                </span>
-              </dd>
-            </div>
-            <div className="p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl">
-              <dt className="text-sm font-bold text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>🌐 Frontend URL</dt>
-              <dd className="mt-2">
-                <a href="https://demitaylornimmo.com" target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-500 font-medium hover:underline">
-                  https://demitaylornimmo.com
-                </a>
-              </dd>
-            </div>
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
-              <dt className="text-sm font-bold text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>🔌 API URL</dt>
-              <dd className="mt-2">
-                <a href={`${(import.meta as any).env.VITE_API_URL || 'https://api.demitaylornimmo.com'}/api`} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-500 font-medium hover:underline">
-                  {`${(import.meta as any).env.VITE_API_URL || 'https://api.demitaylornimmo.com'}/api`}
-                </a>
-              </dd>
-            </div>
-          </dl>
-      </div>
-    </div>
+    </>
   )
 }
-
-export default Settings

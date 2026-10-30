@@ -1,0 +1,117 @@
+[
+  {
+    "id": 101,
+    "slug": "project-one",
+    "title": "Project One",
+    "description": "Description One",
+    "image": "/uploads/p1.svg",
+    "images": [],
+    "technologies": [
+      "React"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-05-01",
+    "status": "completed",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "created_at": "2025-05-01T10:00:00.000Z",
+    "updated_at": "2025-05-01T10:00:00.000Z",
+    "case_study": null,
+    "content": null
+  },
+  {
+    "id": 102,
+    "slug": "project-two",
+    "title": "Project Two",
+    "description": "Description Two",
+    "image": "/uploads/p2.svg",
+    "images": [],
+    "technologies": [
+      "React"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-04-01",
+    "status": "completed",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "created_at": "2025-04-01T10:00:00.000Z",
+    "updated_at": "2025-04-01T10:00:00.000Z",
+    "case_study": null,
+    "content": null
+  },
+  {
+    "id": 103,
+    "slug": "project-three",
+    "title": "Project Three",
+    "description": "Description Three",
+    "image": "/uploads/p3.svg",
+    "images": [],
+    "technologies": [
+      "React"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-03-01",
+    "status": "completed",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "created_at": "2025-03-01T10:00:00.000Z",
+    "updated_at": "2025-03-01T10:00:00.000Z",
+    "case_study": null,
+    "content": null
+  },
+  {
+    "id": 104,
+    "slug": "project-four",
+    "title": "Project Four",
+    "description": "Description Four",
+    "image": "/uploads/p4.svg",
+    "images": [],
+    "technologies": [
+      "React"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-02-01",
+    "status": "completed",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "created_at": "2025-02-01T10:00:00.000Z",
+    "updated_at": "2025-02-01T10:00:00.000Z",
+    "case_study": null,
+    "content": null
+  },
+  {
+    "id": 105,
+    "slug": "project-five",
+    "title": "Project Five",
+    "description": "Description Five",
+    "image": "/uploads/p5.svg",
+    "images": [],
+    "technologies": [
+      "React"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-01-01",
+    "status": "completed",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "created_at": "2025-01-01T10:00:00.000Z",
+    "updated_at": "2025-01-01T10:00:00.000Z",
+    "case_study": null,
+    "content": null
+  }
+]

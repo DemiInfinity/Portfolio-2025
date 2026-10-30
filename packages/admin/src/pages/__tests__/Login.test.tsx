@@ -1,112 +1,96 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
 import Login from '../Login'
 
-// Mock useAuth hook
 const mockLogin = vi.fn()
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({
-    login: mockLogin,
-    loading: false
-  })
+  useAuth: () => ({ login: mockLogin, loading: false }),
 }))
 
-// Mock react-router-dom
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
-  return {
-    ...actual,
-    useNavigate: () => vi.fn()
-  }
-})
-
-const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
-  )
+const fill = (email: string, pw: string) => {
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } })
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: pw } })
 }
 
 describe('Login', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  beforeEach(() => vi.clearAllMocks())
+
+  it('renders the sign-in card with the design copy', () => {
+    const { container } = render(<Login />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Sign in' })).toBeInTheDocument()
+    expect(container.textContent).toContain('Edit the projects, posts and roles on demitaylornimmo.com.')
+    expect(container.textContent).toContain('Only the site owner has an account.')
+    expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'username')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password')
+    expect(container.querySelector('form')).toHaveAttribute('novalidate')
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
   })
 
-  it('should render login form', () => {
-    const { container } = renderWithRouter(<Login />)
-    
-    expect(container.textContent).toContain('Portfolio Admin')
-    expect(screen.getByPlaceholderText('Enter your email')).toBeTruthy()
-    expect(screen.getByPlaceholderText('Enter your password')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeTruthy()
+  it('updates input values when typing', () => {
+    render(<Login />)
+    fill('test@example.com', 'password123')
+    expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+    expect(screen.getByLabelText('Password')).toHaveValue('password123')
   })
 
-  it('should update input values when typing', () => {
-    renderWithRouter(<Login />)
-    
-    const emailInput = screen.getByPlaceholderText('Enter your email')
-    const passwordInput = screen.getByPlaceholderText('Enter your password')
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'password123' } })
-    
-    expect((emailInput as HTMLInputElement).value).toBe('test@example.com')
-    expect((passwordInput as HTMLInputElement).value).toBe('password123')
+  it('submitting empty shows both errors and does not call login', () => {
+    render(<Login />)
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(screen.getByText('Enter the email you sign in with, like name@example.com.')).toBeInTheDocument()
+    expect(screen.getByText('Enter your password.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true')
+    expect(mockLogin).not.toHaveBeenCalled()
   })
 
-  it('should call login function when form is submitted', async () => {
+  it('"name@x" with password "a" shows only the email error', () => {
+    render(<Login />)
+    fill('name@x', 'a')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(screen.getByText('Enter the email you sign in with, like name@example.com.')).toBeInTheDocument()
+    expect(screen.queryByText('Enter your password.')).not.toBeInTheDocument()
+    expect(mockLogin).not.toHaveBeenCalled()
+  })
+
+  it('calls login with the email and password', async () => {
     mockLogin.mockResolvedValue(undefined)
-    
-    renderWithRouter(<Login />)
-    
-    const emailInput = screen.getByPlaceholderText('Enter your email')
-    const passwordInput = screen.getByPlaceholderText('Enter your password')
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'password123' } })
-    fireEvent.click(submitButton)
-    
-    await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123')
-    })
+    render(<Login />)
+    fill('test@example.com', 'password123')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123'))
   })
 
-  it('should show loading state during login', async () => {
-    mockLogin.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)))
-    
-    renderWithRouter(<Login />)
-    
-    const emailInput = screen.getByPlaceholderText('Enter your email')
-    const passwordInput = screen.getByPlaceholderText('Enter your password')
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'password123' } })
-    fireEvent.click(submitButton)
-    
-    expect(screen.getByText('Sign in ✨')).toBeTruthy()
+  it('shows "Signing in" and disables the button while pending', async () => {
+    let resolve!: () => void
+    mockLogin.mockImplementation(() => new Promise<void>((r) => { resolve = r }))
+    render(<Login />)
+    fill('test@example.com', 'password123')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    const btn = await screen.findByRole('button', { name: 'Signing in' })
+    expect(btn).toBeDisabled()
+    expect(btn.querySelector('.spin')).toBeTruthy()
+    resolve()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).not.toBeDisabled())
   })
 
-  it('should handle login error', async () => {
-    const errorMessage = 'Invalid credentials'
-    mockLogin.mockRejectedValue(new Error(errorMessage))
-    
-    renderWithRouter(<Login />)
-    
-    const emailInput = screen.getByPlaceholderText('Enter your email')
-    const passwordInput = screen.getByPlaceholderText('Enter your password')
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'wrong-password' } })
-    fireEvent.click(submitButton)
-    
-    // The login component handles errors via API interceptor, so we just verify login was called
-    await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'wrong-password')
-    })
+  it('on failure shows the alert, clears the password and keeps the email', async () => {
+    mockLogin.mockRejectedValue({ response: { status: 401 } })
+    render(<Login />)
+    fill('test@example.com', 'wrong-password')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("That email and password don't match. Try again.")
+    expect(screen.getByLabelText('Password')).toHaveValue('')
+    expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+  })
+
+  it('"Show" switches the password to text and the button to "Hide"', async () => {
+    const user = userEvent.setup()
+    render(<Login />)
+    const toggle = screen.getByRole('button', { name: 'Show' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    await user.click(toggle)
+    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text')
+    expect(screen.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

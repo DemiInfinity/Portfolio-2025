@@ -21,12 +21,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${siteUrl}/projects`, lastModified: now },
     { url: `${siteUrl}/blog`, lastModified: now },
     { url: `${siteUrl}/experience`, lastModified: now },
+    { url: `${siteUrl}/about`, lastModified: now },
     { url: `${siteUrl}/learning`, lastModified: now },
     { url: `${siteUrl}/privacy`, lastModified: now },
     { url: `${siteUrl}/terms`, lastModified: now },
   ]
 
-  // Projects
+  // Projects (H-19: the API returns only public projects). /cv is never listed (D-5).
   const projectsRes = await fetch(`${apiBase}/projects`, { cache: 'no-store' }).catch(() => null)
   const projectsJson = projectsRes ? await safeJson<{ data?: any[] }>(projectsRes) : null
   const projectRoutes: MetadataRoute.Sitemap =
@@ -36,12 +37,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })) || []
 
   // Blog posts
-  const blogRes = await fetch(`${apiBase}/blog`, { cache: 'no-store' }).catch(() => null)
+  const blogRes = await fetch(`${apiBase}/blog?limit=100`, { cache: 'no-store' }).catch(() => null)
   const blogJson = blogRes ? await safeJson<{ data?: any[] }>(blogRes) : null
   const blogRoutes: MetadataRoute.Sitemap =
     blogJson?.data?.map((post) => ({
       url: `${siteUrl}/blog/${post.slug}`,
-      lastModified: post.created_at ? new Date(post.created_at) : now,
+      lastModified: post.publish_date || post.created_at ? new Date(post.publish_date || post.created_at) : now,
     })) || []
 
   return [...staticRoutes, ...projectRoutes, ...blogRoutes]

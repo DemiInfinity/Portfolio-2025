@@ -1,332 +1,190 @@
 import express from 'express'
-import { body, validationResult } from 'express-validator'
+import { body } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { normaliseDate, isDateInput, isRequiredDateInput } from '../utils/dates'
+import { toStringArray, parseListInput } from '../utils/lists'
+import { rejectInvalid, sendInvalid, optionalText } from '../utils/validation'
+import { insertRow, updateRow, selectById, selectRows, isIntId, Row } from '../utils/db'
+import { markCvDirty } from '../services/cvDirty'
 
 const router = express.Router()
 
+export const LEARNING_STATUSES = ['not_started', 'in_progress', 'completed', 'paused']
+
+export const COLUMNS = 'id, title, provider, description, progress, category, start_date, estimated_completion, resources, status, created_at, updated_at'
+export const LEGACY_COLUMNS = 'id, title, description, progress, category, start_date, estimated_completion, resources, status, created_at, updated_at'
+const NEW_COLUMNS = ['provider']
+
+/** `provider` is null when unset, and absent only before the migration has run. */
+export function formatLearning(item: Row): Row {
+  return {
+    ...item,
+    description: item.description ?? null,
+    resources: toStringArray(item.resources)
+  }
+}
+
+const textField = (name: string, max: number) =>
+  body(name)
+    .optional({ nullable: true })
+    .custom((v) => typeof v === 'string')
+    .withMessage(`${name} must be text`)
+    .bail()
+    .isLength({ max })
+    .withMessage(`${name} is at most ${max} characters`)
+
+const validators = (isCreate: boolean) => [
+  isCreate
+    ? body('title').isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title is required')
+    : body('title').optional().isString().trim().isLength({ min: 1, max: 255 }).withMessage('Title cannot be empty'),
+  isCreate
+    ? body('category').isString().trim().isLength({ min: 1, max: 100 }).withMessage('Category is required')
+    : body('category').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('Category cannot be empty'),
+  isCreate
+    ? body('start_date').custom(isRequiredDateInput).withMessage('Start date must be YYYY-MM or YYYY-MM-DD')
+    : body('start_date').optional().custom(isRequiredDateInput).withMessage('Start date must be YYYY-MM or YYYY-MM-DD'),
+  body('estimated_completion').optional({ nullable: true }).custom(isDateInput).withMessage('Target date must be YYYY-MM or YYYY-MM-DD'),
+  textField('provider', 120),
+  textField('description', 2000),
+  body('progress').optional().isInt({ min: 0, max: 100 }).withMessage('Progress is a whole number from 0 to 100').toInt(),
+  body('status').optional().isIn(LEARNING_STATUSES).withMessage(`Status is one of ${LEARNING_STATUSES.join(', ')}`),
+  body('resources').optional({ nullable: true }).custom((v) => parseListInput(v, ',') !== null).withMessage('Resources must be a list')
+]
+
+function toPayload(input: Row): Row {
+  const out: Row = {}
+  if ('title' in input) out.title = String(input.title).trim()
+  if ('category' in input) out.category = String(input.category).trim()
+  if ('start_date' in input) out.start_date = normaliseDate(input.start_date)
+  if ('estimated_completion' in input) out.estimated_completion = normaliseDate(input.estimated_completion)
+  if ('provider' in input) out.provider = optionalText(input.provider)
+  if ('description' in input) out.description = optionalText(input.description)
+  if ('progress' in input) out.progress = Number(input.progress)
+  if ('status' in input) out.status = input.status
+  if ('resources' in input) out.resources = parseListInput(input.resources, ',') || []
+  return out
+}
+
+/**
+ * Progress and status move together: progress 100 without a status means
+ * completed, and status completed without a progress means 100.
+ */
+export function applyProgressRules(payload: Row): Row {
+  const out = { ...payload }
+  if (out.progress === 100 && out.status === undefined) out.status = 'completed'
+  if (out.status === 'completed' && out.progress === undefined) out.progress = 100
+  return out
+}
+
+const listColumnsBy = (build: (q: any) => any) => selectRows('learning', COLUMNS, LEGACY_COLUMNS, build)
+
 // Get all learning items (public)
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
-    const { supabaseService } = getServices()
-    
-    const { data: learningItems, error } = await supabaseService.getClient()
-      .from('learning')
-      .select('id, title, description, progress, category, start_date, estimated_completion, resources, status, created_at, updated_at')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-
-    const parsedLearning = learningItems.map((item: any) => ({
-      ...item,
-      resources: item.resources ? (
-        typeof item.resources === 'string' ? 
-          (item.resources.startsWith('[') ? JSON.parse(item.resources) : [item.resources]) :
-          item.resources
-      ) : []
-    }))
-
-    return res.json({
-      success: true,
-      data: parsedLearning
-    })
+    const items = await listColumnsBy((q) => q.order('created_at', { ascending: false }))
+    return res.json({ success: true, data: items.map(formatLearning) })
   } catch (error) {
     console.error('Get learning error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get learning items by skills category (public)
-router.get('/skills', async (req: Request, res: Response) => {
+// Get learning items in the 'skills' category (public)
+router.get('/skills', async (_req: Request, res: Response) => {
   try {
-    const { supabaseService } = getServices()
-    
-    const { data: learning, error } = await supabaseService.getClient()
-      .from('learning')
-      .select('id, title, description, progress, category, start_date, estimated_completion, resources, status')
-      .eq('category', 'skills')
-      .order('start_date', { ascending: false })
-    
-    if (error) throw error
-
-    const parsedLearning = learning.map((item: any) => ({
-      ...item,
-      resources: item.resources ? (
-        typeof item.resources === 'string' ? 
-          (item.resources.startsWith('[') ? JSON.parse(item.resources) : [item.resources]) :
-          item.resources
-      ) : []
-    }))
-
-    return res.json({
-      success: true,
-      data: parsedLearning
-    })
+    const items = await listColumnsBy((q) => q.eq('category', 'skills').order('start_date', { ascending: false }))
+    return res.json({ success: true, data: items.map(formatLearning) })
   } catch (error) {
     console.error('Get learning skills error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
 // Get learning items by category (public)
 router.get('/category/:category', async (req: Request, res: Response) => {
   try {
-    const { category } = req.params
-    const { supabaseService } = getServices()
-    
-    const { data: learning, error } = await supabaseService.getClient()
-      .from('learning')
-      .select('id, title, description, progress, category, start_date, estimated_completion, resources, status')
-      .eq('category', category)
-      .order('start_date', { ascending: false })
-    
-    if (error) throw error
-
-    const parsedLearning = learning.map((item: any) => ({
-      ...item,
-      resources: item.resources ? (
-        typeof item.resources === 'string' ? 
-          (item.resources.startsWith('[') ? JSON.parse(item.resources) : [item.resources]) :
-          item.resources
-      ) : []
-    }))
-
-    return res.json({
-      success: true,
-      data: parsedLearning
-    })
+    const category = String(req.params.category)
+    const items = await listColumnsBy((q) => q.eq('category', category).order('start_date', { ascending: false }))
+    return res.json({ success: true, data: items.map(formatLearning) })
   } catch (error) {
     console.error('Get learning by category error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
 // Get single learning item by ID (public)
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    
-    // Validate that id is a number
-    if (!/^\d+$/.test(id)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid ID format'
-      })
+    const id = String(req.params.id)
+    if (!isIntId(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid ID format' })
     }
-    
-    const { supabaseService } = getServices()
-    const { data: learningItem, error: fetchError } = await supabaseService.getClient()
-      .from('learning')
-      .select('id, title, description, progress, category, start_date, estimated_completion, resources, status')
-      .eq('id', id)
-      .single()
-
-    if (fetchError || !learningItem) {
-      return res.status(404).json({
-        success: false,
-        error: 'Learning item not found'
-      })
+    const item = await selectById('learning', id, COLUMNS, LEGACY_COLUMNS)
+    if (!item) {
+      return res.status(404).json({ success: false, error: 'Learning item not found' })
     }
-
-    const parsedItem = {
-      ...learningItem,
-      resources: learningItem.resources ? (
-        typeof learningItem.resources === 'string' ? 
-          (learningItem.resources.startsWith('[') ? JSON.parse(learningItem.resources) : [learningItem.resources]) :
-          learningItem.resources
-      ) : []
-    }
-
-    return res.json({
-      success: true,
-      data: parsedItem
-    })
+    return res.json({ success: true, data: formatLearning(item) })
   } catch (error) {
     console.error('Get learning item error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
 // Create learning item (admin only)
-router.post('/', [
-  authenticate,
-  authorize('admin'),
-  body('title').isLength({ min: 1 }).trim(),
-  body('description').isLength({ min: 1 }).trim(),
-  body('progress').isNumeric().toFloat(),
-  body('category').isLength({ min: 1 }).trim(),
-  body('start_date').isISO8601(),
-  body('estimated_completion').optional({ nullable: true, checkFalsy: true }).isISO8601(),
-  body('resources').optional().isArray(),
-  body('status').isIn(['not_started', 'in_progress', 'completed', 'paused'])
-], async (req: AuthRequest, res: Response) => {
+router.post('/', [authenticate, authorize('admin'), ...validators(true)], async (req: AuthRequest, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      console.error('Learning validation errors:', errors.array())
-      console.error('Request body:', req.body)
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
-    }
+    if (rejectInvalid(req, res)) return
 
-    const {
-      title,
-      description,
-      progress,
-      category,
-      start_date,
-      estimated_completion,
-      resources = [],
-      status
-    } = req.body
-
-    const { supabaseService } = getServices()
-    // Handle empty estimated_completion date
-    const completionDate = estimated_completion && estimated_completion.trim() !== '' ? estimated_completion : null
-    
-    // Insert new learning item
-    const newItem = await supabaseService.insert('learning', {
-      title,
-      description,
-      progress,
-      category,
-      start_date,
-      estimated_completion: completionDate,
-      resources,
-      status
+    const payload = applyProgressRules({
+      progress: 0,
+      ...toPayload(req.body)
     })
+    payload.status = payload.status ?? (payload.progress === 100 ? 'completed' : 'in_progress')
+    payload.description = payload.description ?? null
+    payload.provider = payload.provider ?? null
+    payload.estimated_completion = payload.estimated_completion ?? null
+    payload.resources = payload.resources ?? []
 
-    return res.status(201).json({
-      success: true,
-      data: {
-        ...newItem,
-        resources: (() => {
-          try {
-            return JSON.parse(newItem.resources || '[]')
-          } catch {
-            return []
-          }
-        })()
-      }
-    })
+    const newItem = await insertRow('learning', payload, NEW_COLUMNS)
+    await markCvDirty()
+    return res.status(201).json({ success: true, data: formatLearning(newItem) })
   } catch (error) {
     console.error('Create learning item error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Update learning item (admin only)
-router.put('/:id', [
-  authenticate,
-  authorize('admin'),
-  body('title').optional().isLength({ min: 1 }).trim(),
-  body('description').optional().isLength({ min: 1 }).trim(),
-  body('progress').optional().isNumeric().toFloat(),
-  body('category').optional().isLength({ min: 1 }).trim(),
-  body('start_date').optional().isISO8601(),
-  body('estimated_completion').optional({ nullable: true, checkFalsy: true }).isISO8601(),
-  body('resources').optional().isArray(),
-  body('status').optional().isIn(['not_started', 'in_progress', 'completed', 'paused'])
-], async (req: AuthRequest, res: Response) => {
+// Update learning item (admin only, partial)
+router.put('/:id', [authenticate, authorize('admin'), ...validators(false)], async (req: AuthRequest, res: Response) => {
   try {
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid input',
-        details: errors.array()
-      })
+    if (rejectInvalid(req, res)) return
+
+    const id = String(req.params.id)
+    if (!isIntId(id)) return sendInvalid(res, [{ path: 'id', msg: 'Invalid ID format' }])
+
+    const payload = applyProgressRules(toPayload(req.body))
+    payload.updated_at = new Date().toISOString()
+
+    const updated = await updateRow('learning', id, payload, NEW_COLUMNS)
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Learning item not found' })
     }
-
-    const { id } = req.params
-    const updateData = req.body
-    const { supabaseService } = getServices()
-
-    // Check if learning item exists
-    const { data: existingItem, error: checkError } = await supabaseService.getClient()
-      .from('learning')
-      .select('id')
-      .eq('id', id)
-      .single()
-
-    if (checkError || !existingItem) {
-      return res.status(404).json({
-        success: false,
-        error: 'Learning item not found'
-      })
-    }
-
-    // Prepare update payload
-    const updatePayload: any = {}
-    
-    Object.keys(updateData).forEach(key => {
-      if (key === 'resources') {
-        // Ensure resources array is stored as JSON string
-        updatePayload[key] = JSON.stringify(updateData[key])
-      } else if (key === 'estimated_completion') {
-        // Handle empty estimated_completion date
-        const completionDate = updateData[key] && updateData[key].trim() !== '' ? updateData[key] : null
-        updatePayload[key] = completionDate
-      } else if (key !== 'id') {
-        // Include all other fields except id
-        updatePayload[key] = updateData[key]
-      }
-    })
-
-    // Always update updated_at
-    updatePayload.updated_at = new Date().toISOString()
-
-    // Use Supabase client update method
-    const updatedItem = await supabaseService.update('learning', id, updatePayload)
-
-    return res.json({
-      success: true,
-      data: {
-        ...updatedItem,
-        resources: (() => {
-          try {
-            return JSON.parse(updatedItem.resources || '[]')
-          } catch {
-            return []
-          }
-        })()
-      }
-    })
+    await markCvDirty()
+    return res.json({ success: true, data: formatLearning(updated) })
   } catch (error) {
     console.error('Update learning item error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
 // Delete learning item (admin only)
 router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = String(req.params.id)
     const { supabaseService } = getServices()
 
-    // Check if learning item exists and delete it
     const { data: deletedItem, error } = await supabaseService.getClient()
       .from('learning')
       .delete()
@@ -335,22 +193,14 @@ router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthReques
       .single()
 
     if (error || !deletedItem) {
-      return res.status(404).json({
-        success: false,
-        error: 'Learning item not found'
-      })
+      return res.status(404).json({ success: false, error: 'Learning item not found' })
     }
 
-    return res.json({
-      success: true,
-      message: 'Learning item deleted successfully'
-    })
+    await markCvDirty()
+    return res.json({ success: true, message: 'Learning item deleted successfully' })
   } catch (error) {
     console.error('Delete learning item error:', error)
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 

@@ -1,73 +1,122 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { screen, within, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Layout from '../Layout'
+import { renderApp } from '@/test/utils'
+import { api } from '@/lib/api'
 
-// Mock useAuth hook
+const logout = vi.fn()
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     user: { id: '1', name: 'Test User', email: 'test@example.com', role: 'admin' },
-    logout: vi.fn()
-  })
+    logout,
+  }),
 }))
 
-// Mock react-router-dom
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
-  return {
-    ...actual,
-    useNavigate: () => vi.fn(),
-    useLocation: () => ({ pathname: '/dashboard' })
-  }
+vi.mock('@/lib/api', () => ({ api: { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
+
+const flags = (maintenance: boolean) => ({
+  data: { success: true, data: [
+    { id: 1, name: 'maintenance_mode', description: '', enabled: maintenance },
+    { id: 2, name: 'open_to_work', description: '', enabled: true },
+  ] },
 })
 
-const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
-  )
+function Where() {
+  const loc = useLocation()
+  return <p data-testid="where">{loc.pathname + loc.search}</p>
 }
+
+const ui = (
+  <Layout>
+    <Routes>
+      <Route path="*" element={<Where />} />
+    </Routes>
+  </Layout>
+)
 
 describe('Layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.get).mockResolvedValue(flags(false))
   })
 
-  it('should render the layout component', () => {
-    const { container } = renderWithRouter(<Layout><div>Test Content</div></Layout>)
-    
-    expect(container.textContent).toContain('Admin Panel')
+  it('renders the brand, the user and the sign out button', () => {
+    const { container } = renderApp(ui)
+    expect(container.textContent).toContain('Demi')
+    expect(container.textContent).toContain('Admin')
     expect(container.textContent).toContain('Test User')
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('should render navigation menu', () => {
-    const { container } = renderWithRouter(<Layout><div>Test Content</div></Layout>)
-    
-    expect(container.textContent).toContain('Dashboard')
-    expect(container.textContent).toContain('Projects')
-    expect(container.textContent).toContain('Blog')
-    expect(container.textContent).toContain('Education')
-    expect(container.textContent).toContain('Certifications')
-    expect(container.textContent).toContain('Work History')
-    expect(container.textContent).toContain('Learning')
-    expect(container.textContent).toContain('Analytics')
-    expect(container.textContent).toContain('Settings')
-  })
-
-  it('should render logout button', () => {
-    const { container } = renderWithRouter(<Layout><div>Test Content</div></Layout>)
-    
-    expect(container.textContent).toContain('Sign out')
-  })
-
-  it('should have correct navigation links', () => {
-    const { container } = renderWithRouter(<Layout><div>Test Content</div></Layout>)
-    
-    expect(container.textContent).toContain('Dashboard')
+  it('renders the 11 links in order under Content and Site, with the design labels', () => {
+    const { container } = renderApp(ui, { route: '/blog' })
+    const side = container.querySelector('nav.ad-side') as HTMLElement
+    const labels = within(side).getAllByRole('link').slice(1).map((a) => a.textContent)
+    expect(labels).toEqual(['Dashboard', 'About', 'Projects', 'Blog', 'Work history', 'Education', 'Certifications', 'Learning', 'Analytics', 'Feature flags', 'Settings'])
+    expect(side.textContent).toContain('Content')
+    expect(side.textContent).toContain('Site')
     expect(container.querySelector('a[href="/"]')).toBeTruthy()
-    
-    expect(container.textContent).toContain('Projects')
     expect(container.querySelector('a[href="/projects"]')).toBeTruthy()
+    const current = side.querySelectorAll('[aria-current="page"]')
+    expect(current).toHaveLength(1)
+    expect(current[0]).toHaveTextContent('Blog')
+  })
+
+  it('calls logout from the sidebar', async () => {
+    const user = userEvent.setup()
+    renderApp(ui)
+    await user.click(screen.getByRole('button', { name: 'Sign out' }))
+    expect(logout).toHaveBeenCalled()
+  })
+
+  it('reads Live, or "Maintenance page showing" when maintenance_mode is on', async () => {
+    renderApp(ui)
+    expect(await screen.findByText('Live')).toBeInTheDocument()
+  })
+
+  it('shows "Maintenance page showing" when the flag is on', async () => {
+    vi.mocked(api.get).mockResolvedValue(flags(true))
+    renderApp(ui)
+    expect(await screen.findByText('Maintenance page showing')).toBeInTheDocument()
+  })
+
+  it('writes the top search to ?q= with the per-page placeholder', async () => {
+    const user = userEvent.setup()
+    renderApp(ui, { route: '/projects' })
+    const box = screen.getByRole('searchbox')
+    expect(box).toHaveAttribute('placeholder', 'Search projects')
+    expect(screen.getByLabelText('Search the admin')).toBe(box)
+    await user.type(box, 'luna')
+    expect(box).toHaveValue('luna')
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/projects?q=luna'))
+  })
+
+  it('keeps every character when typed with no delay (QA NB-1)', async () => {
+    const user = userEvent.setup({ delay: null })
+    renderApp(ui, { route: '/projects' })
+    const box = screen.getByRole('searchbox')
+    await user.type(box, 'sqlite')
+    expect(box).toHaveValue('sqlite')
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/projects?q=sqlite'))
+  })
+
+  it('opens the phone menu sheet, closes on a link click and on Esc, and restores focus', async () => {
+    const user = userEvent.setup()
+    renderApp(ui)
+    const open = screen.getByRole('button', { name: 'Open menu' })
+    expect(open).toHaveAttribute('aria-expanded', 'false')
+    await user.click(open)
+    const sheet = screen.getByRole('dialog', { name: 'Admin menu' })
+    expect(within(sheet).getAllByRole('link')).toHaveLength(12) // 11 nav + View site
+    expect(within(sheet).getByRole('button', { name: 'Close menu' })).toHaveFocus()
+    await user.click(within(sheet).getByRole('link', { name: 'Education' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('where')).toHaveTextContent('/education')
+    await user.click(open)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(open).toHaveFocus()
   })
 })

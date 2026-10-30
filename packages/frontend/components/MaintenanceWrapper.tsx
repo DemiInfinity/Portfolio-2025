@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { usePathname } from 'next/navigation'
 import { useMaintenanceMode } from '../lib/useMaintenanceMode'
 import MaintenancePage from './MaintenancePage'
+import { MAINTENANCE_EXEMPT, matchesRoute } from '../lib/routes'
 
 interface MaintenanceWrapperProps {
   children: React.ReactNode
@@ -11,23 +12,16 @@ interface MaintenanceWrapperProps {
 
 const MaintenanceWrapper: React.FC<MaintenanceWrapperProps> = ({ children }) => {
   const { isMaintenanceMode, isLoading, error } = useMaintenanceMode()
-  const [showMaintenance, setShowMaintenance] = useState(false)
   const pathname = usePathname()
-  const isLegalPage = pathname === '/privacy' || pathname === '/terms'
+  // Legal pages and the generated CV never show the maintenance page.
+  const isExempt = matchesRoute(pathname, MAINTENANCE_EXEMPT)
 
-  // Check maintenance mode in the background without blocking initial render
-  useEffect(() => {
-    // Only show maintenance page if maintenance mode is confirmed enabled
-    // Don't show during loading or on error (fail-safe approach)
-    if (!isLoading && !error && isMaintenanceMode) {
-      setShowMaintenance(true)
-    } else {
-      setShowMaintenance(false)
-    }
-  }, [isMaintenanceMode, isLoading, error])
+  // Only show the maintenance page once maintenance mode is confirmed enabled;
+  // never during loading or on error (fail-safe).
+  const showMaintenance = !isLoading && !error && isMaintenanceMode
 
   // Show maintenance page only if maintenance mode is confirmed enabled
-  if (showMaintenance && !isLegalPage) {
+  if (showMaintenance && !isExempt) {
     return (
       <MaintenancePage 
         estimatedTime="a few hours"

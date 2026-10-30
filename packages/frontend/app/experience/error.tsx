@@ -17,7 +17,7 @@ export default function Error({
   return (
     <PageError
       title="Couldn't load experience"
-      message="We couldn't reach the server to load work history, education and certifications. It's hosted on Railway and naps when idle, so it may just need a moment to wake up - try again in a few seconds."
+      message="We couldn’t reach the server to load work history, education and certifications. The server naps when nobody’s around, so it may just need a moment to wake up. Try again in a few seconds."
       reset={reset}
     />
   )

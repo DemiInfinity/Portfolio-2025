@@ -1,353 +1,336 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { Plus, Edit, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { apiError, fieldErrors } from '@/lib/errors'
+import { commas, duration, isoMonth, lines, monthOf, monthRange, monthToApi, monthsInclusive, plural, toArray } from '@/lib/format'
+import { useQ } from '@/hooks/useQ'
+import { useEditParam } from '@/hooks/useEditParam'
+import Dialog, { SaveButton } from '@/components/ui/Dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Field from '@/components/ui/Field'
+import Switch from '@/components/ui/Switch'
+import Icon from '@/components/ui/Icon'
+import { SkeletonRows } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 
-interface WorkHistoryItem {
+export interface Role {
   id: number
   company: string
   position: string
-  location: string
+  location?: string | null
   start_date: string
-  end_date?: string
-  description: string
+  end_date?: string | null
+  description?: string | null
   achievements: string[]
+  highlights: string[]
   technologies: string[]
-  company_url?: string
+  company_url?: string | null
 }
 
-interface WorkHistoryForm {
-  company: string
+type Draft = {
   position: string
+  company: string
   location: string
-  start_date: string
-  end_date?: string
+  url: string
+  start: string
+  end: string
+  current: boolean
   description: string
   achievements: string
-  technologies: string
-  company_url?: string
+  highlights: string
+  techText: string
 }
 
-const WorkHistory = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<WorkHistoryItem | null>(null)
-  const queryClient = useQueryClient()
+const EMPTY: Draft = { position: '', company: '', location: '', url: '', start: '', end: '', current: false, description: '', achievements: '', highlights: '', techText: '' }
 
-  const { data: workHistory, isLoading: workLoading } = useQuery({
-    queryKey: ['work-history'],
-    queryFn: async () => {
-      const response = await api.get('/work-history')
-      return response.data.data as WorkHistoryItem[]
-    }
+export const WORK_KEY = ['work-history'] as const
+
+export const fetchRoles = async (): Promise<Role[]> => {
+  const res = await api.get('/work-history')
+  return ((res.data?.data || []) as Role[]).map((r) => ({
+    ...r,
+    achievements: toArray(r.achievements),
+    highlights: toArray(r.highlights),
+    technologies: toArray(r.technologies),
+  }))
+}
+
+/** Current roles first, then newest start first. */
+export const sortRoles = (roles: Role[]) =>
+  roles.slice().sort((a, b) => {
+    const ca = !a.end_date
+    const cb = !b.end_date
+    if (ca !== cb) return ca ? -1 : 1
+    return a.start_date < b.start_date ? 1 : a.start_date > b.start_date ? -1 : 0
   })
 
+export const initials = (company: string) => (company.match(/\d+[A-Z]|[A-Z]/g) || ['?']).slice(0, 2).join('')
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<WorkHistoryForm>()
+/** Client rule for Impact highlights (H-11): at most 6 lines of 1–60 characters. */
+export const highlightsError = (text: string) => {
+  const items = lines(text)
+  if (items.length > 6) return 'Up to 6 highlights.'
+  if (items.some((h) => h.length > 60)) return 'Keep each highlight to 60 characters.'
+  return null
+}
 
-  const createMutation = useMutation({
-    mutationFn: (data: WorkHistoryForm) => api.post('/work-history', {
-      ...data,
-      achievements: data.achievements.split('\n').filter(a => a.trim()),
-      technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t)
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-history'] })
-      toast.success('Work history created successfully')
-      setIsModalOpen(false)
-      reset()
-    }
+const toDraft = (r: Role): Draft => ({
+  position: r.position || '',
+  company: r.company || '',
+  location: r.location || '',
+  url: r.company_url || '',
+  start: monthOf(r.start_date),
+  end: monthOf(r.end_date),
+  current: !r.end_date,
+  description: r.description || '',
+  achievements: r.achievements.join('\n'),
+  highlights: r.highlights.join('\n'),
+  techText: r.technologies.join(', '),
+})
+
+const toBody = (d: Draft) => ({
+  position: d.position.trim(),
+  company: d.company.trim(),
+  location: d.location.trim(),
+  company_url: d.url.trim() || null,
+  start_date: monthToApi(d.start),
+  end_date: d.current ? null : monthToApi(d.end),
+  description: d.description.trim(),
+  achievements: lines(d.achievements),
+  highlights: lines(d.highlights),
+  technologies: commas(d.techText),
+})
+
+const roleBody = (r: Role) => ({
+  position: r.position,
+  company: r.company,
+  location: r.location || '',
+  company_url: r.company_url || null,
+  start_date: r.start_date,
+  end_date: r.end_date || null,
+  description: r.description || '',
+  achievements: r.achievements,
+  highlights: r.highlights,
+  technologies: r.technologies,
+})
+
+// Server `details[].path` -> draft field
+const PATH: Record<string, keyof Draft> = { position: 'position', company: 'company', location: 'location', company_url: 'url', start_date: 'start', end_date: 'end', description: 'description', achievements: 'achievements', highlights: 'highlights', technologies: 'techText' }
+
+const GRID = 'minmax(0, 1fr) minmax(0, 280px) 170px 80px'
+
+export default function WorkHistory() {
+  const qc = useQueryClient()
+  const { say } = useToast()
+  const [q] = useQ()
+  const { data: roles, isLoading } = useQuery({ queryKey: WORK_KEY, queryFn: fetchRoles })
+
+  const [editId, setEditId] = useState<number | 'new' | null>(null)
+  const [d, setD] = useState<Draft>(EMPTY)
+  const [tried, setTried] = useState(false)
+  const [serverErr, setServerErr] = useState<Record<string, string>>({})
+  const [confirming, setConfirming] = useState(false)
+
+  const open = (r: Role | null) => {
+    setEditId(r ? r.id : 'new')
+    setD(r ? toDraft(r) : EMPTY)
+    setTried(false)
+    setServerErr({})
+    setConfirming(false)
+  }
+  const close = () => setEditId(null)
+  useEditParam(roles, open)
+
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setD((p) => ({ ...p, [k]: v }))
+    setServerErr((e) => ({ ...e, [k]: '' }))
+  }
+
+  const clientErr: Partial<Record<keyof Draft, string>> = tried
+    ? {
+        position: d.position.trim() ? undefined : 'Add the job title.',
+        company: d.company.trim() ? undefined : 'Add the company.',
+        start: d.start ? undefined : 'Add the start month.',
+      }
+    : {}
+  const hlErr = highlightsError(d.highlights)
+  const err = (k: keyof Draft) => clientErr[k] || serverErr[k] || (k === 'highlights' && tried ? hlErr : null) || null
+
+  const save = useMutation({
+    mutationFn: async (draft: Draft) => {
+      const body = toBody(draft)
+      const res = editId === 'new' ? await api.post('/work-history', body) : await api.put(`/work-history/${editId}`, body)
+      const savedId: number | undefined = res.data?.data?.id ?? (editId === 'new' ? undefined : (editId as number))
+      // A new current role ends the previous current one at the start of this month (owner default Q3).
+      if (draft.current) {
+        const others = (roles || []).filter((r) => !r.end_date && r.id !== savedId && r.id !== editId)
+        const end = monthToApi(isoMonth(new Date()))
+        for (const r of others) await api.put(`/work-history/${r.id}`, { ...roleBody(r), end_date: end })
+      }
+      return draft
+    },
+    onSuccess: (draft) => {
+      qc.invalidateQueries({ queryKey: WORK_KEY })
+      close()
+      say(`Saved ${draft.position.trim()} at ${draft.company.trim()}`)
+    },
+    onError: (e) => {
+      const fe = fieldErrors(e)
+      const mapped: Record<string, string> = {}
+      for (const [p, m] of Object.entries(fe)) if (PATH[p]) mapped[PATH[p]] = m
+      if (Object.keys(mapped).length) setServerErr(mapped)
+      else say(apiError(e))
+    },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: WorkHistoryForm }) => api.put(`/work-history/${id}`, {
-      ...data,
-      achievements: data.achievements.split('\n').filter(a => a.trim()),
-      technologies: data.technologies.split(',').map(t => t.trim()).filter(t => t)
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-history'] })
-      toast.success('Work history updated successfully')
-      setIsModalOpen(false)
-      setEditingItem(null)
-      reset()
-    }
-  })
-
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/work-history/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-history'] })
-      toast.success('Work history deleted successfully')
-    }
+      qc.invalidateQueries({ queryKey: WORK_KEY })
+      setConfirming(false)
+      close()
+      say('Role deleted')
+    },
+    onError: (e) => {
+      setConfirming(false)
+      say(apiError(e, "Couldn't delete. Try again."))
+    },
   })
 
-  const onSubmit = (data: WorkHistoryForm) => {
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data })
-    } else {
-      createMutation.mutate(data)
-    }
+  const submit = () => {
+    setTried(true)
+    if (!d.position.trim() || !d.company.trim() || !d.start || highlightsError(d.highlights)) return
+    save.mutate(d)
   }
 
-  const openModal = (item?: WorkHistoryItem) => {
-    if (item) {
-      setEditingItem(item)
-      reset({
-        company: item.company,
-        position: item.position,
-        location: item.location,
-        start_date: item.start_date,
-        end_date: item.end_date,
-        description: item.description,
-        achievements: item.achievements.join('\n'),
-        technologies: item.technologies.join(', '),
-        company_url: item.company_url
-      })
-    } else {
-      setEditingItem(null)
-      reset({
-        company: '',
-        position: '',
-        location: '',
-        start_date: '',
-        end_date: '',
-        description: '',
-        achievements: '',
-        technologies: '',
-        company_url: ''
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const closeModal = () => {
-    setIsModalOpen(false)
-    setEditingItem(null)
-    reset()
-  }
+  const sorted = useMemo(() => sortRoles(roles || []), [roles])
+  const needle = q.trim().toLowerCase()
+  const shown = needle
+    ? sorted.filter((r) => [r.position, r.company, r.location || '', ...r.technologies].join(' ').toLowerCase().includes(needle))
+    : sorted
+  const companies = new Set((roles || []).map((r) => r.company)).size
+  const nowMonth = isoMonth(new Date())
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <>
+      <div className="ad-head">
         <div>
-          <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>💼 Work History</h1>
-          <p className="mt-2 text-gray-600 font-medium">
-            Manage your amazing professional journey ✨
+          <h1 className="ad-title">Work history</h1>
+          <p className="ad-sub">
+            {roles ? `${plural(roles.length, 'role', 'roles')} at ${plural(companies, 'company', 'companies')}, newest first. Shown on Experience and the CV.` : ' '}
           </p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="btn-primary floating-hearts"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Experience
+        <button type="button" className="btn btn-primary" onClick={() => open(null)}>
+          <Icon name="plus" size={16} />
+          Add a role
         </button>
       </div>
 
-
-      {/* Work Experience */}
-      <div className="space-y-6">
-          {workLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="text-center">
-                <div className="spinner mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Loading your career journey... 💼</p>
-              </div>
-            </div>
-          ) : (
-            workHistory?.map((item) => (
-              <div key={item.id} className="card p-6 hover:scale-105 transition-all duration-300">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>{item.position}</h3>
-                    <p className="text-pink-600 font-semibold text-lg">{item.company}</p>
-                    <p className="text-gray-600 font-medium">📍 {item.location}</p>
-                    <p className="text-pink-500 font-medium text-sm">
-                      📅 {new Date(item.start_date).toLocaleDateString()} - {item.end_date ? new Date(item.end_date).toLocaleDateString() : '✨ Present'}
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => openModal(item)}
-                      className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to delete this work experience? 💔')) {
-                          deleteMutation.mutate(item.id)
-                        }
-                      }}
-                      className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-4 font-medium leading-relaxed">{item.description}</p>
-                {item.achievements.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">🏆 Key Achievements:</h4>
-                    <ul className="space-y-2">
-                      {item.achievements.map((achievement, index) => (
-                        <li key={index} className="text-sm text-gray-600 flex items-start">
-                          <span className="text-pink-500 mr-2 mt-1">✨</span>
-                          <span className="font-medium">{achievement}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {item.technologies.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center">🛠️ Technologies:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {item.technologies.map((tech) => (
-                        <span key={tech} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
-                          {tech}
-                        </span>
-                      ))}
+      <section className="card" aria-label="Roles, newest first">
+        <div className="lh" style={{ gridTemplateColumns: GRID }}>
+          <span>Role</span>
+          <span className="hide-sm">Technologies</span>
+          <span className="right">Dates</span>
+          <span className="sr">Actions</span>
+        </div>
+        {isLoading ? (
+          <SkeletonRows />
+        ) : (
+          <ul className="rows">
+            {shown.map((r) => {
+              const n = r.achievements.length
+              return (
+                <li key={r.id} className="row" style={{ gridTemplateColumns: GRID, minHeight: 80 }}>
+                  <div className="cell-id">
+                    <span className="mark" aria-hidden="true">{initials(r.company)}</span>
+                    <div>
+                      <p className="r1" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {r.position}
+                        {!r.end_date ? <span className="pill p-hue">Current</span> : null}
+                      </p>
+                      <p className="r2">{[r.company, r.location, plural(n, 'achievement', 'achievements')].filter(Boolean).join(' · ')}</p>
                     </div>
                   </div>
-                )}
-              </div>
-            ))
-          )}
-      </div>
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="modal-overlay fixed inset-0" onClick={closeModal}></div>
-            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="modal-header">
-                  <h3 className="text-xl font-bold">
-                    {editingItem ? '✨ Edit Work Experience' : '💼 Add Work Experience'}
-                  </h3>
-                </div>
-                <div className="modal-body">
-                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div className="form-group">
-                      <label className="form-label">🏢 Company</label>
-                      <input
-                        {...register('company', { required: 'Company is required' })}
-                        type="text"
-                        className="form-input"
-                        placeholder="Amazing Company Inc."
-                      />
-                      {errors.company && <p className="text-red-500 text-sm mt-1">{errors.company.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">💼 Position</label>
-                      <input
-                        {...register('position', { required: 'Position is required' })}
-                        type="text"
-                        className="form-input"
-                        placeholder="Senior Software Engineer"
-                      />
-                      {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">📍 Location</label>
-                      <input
-                        {...register('location', { required: 'Location is required' })}
-                        type="text"
-                        className="form-input"
-                        placeholder="San Francisco, CA"
-                      />
-                      {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🌐 Company URL</label>
-                      <input
-                        {...register('company_url')}
-                        type="url"
-                        className="form-input"
-                        placeholder="https://company.com"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">📅 Start Date</label>
-                      <input
-                        {...register('start_date', { required: 'Start date is required' })}
-                        type="date"
-                        className="form-input"
-                      />
-                      {errors.start_date && <p className="text-red-500 text-sm mt-1">{errors.start_date.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🏁 End Date (leave empty if current)</label>
-                      <input
-                        {...register('end_date')}
-                        type="date"
-                        className="form-input"
-                      />
-                    </div>
+                  <div className="chips hide-sm" style={{ flexWrap: 'nowrap', overflow: 'hidden' }}>
+                    {r.technologies.slice(0, 3).map((t) => <span key={t} className="chip">{t}</span>)}
+                    {r.technologies.length > 3 ? <span className="mute" style={{ fontSize: 12, alignSelf: 'center', whiteSpace: 'nowrap' }}>+{r.technologies.length - 3}</span> : null}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">📝 Job Description</label>
-                    <textarea
-                      {...register('description', { required: 'Description is required' })}
-                      rows={4}
-                      className="form-textarea"
-                      placeholder="Describe your role and responsibilities..."
-                    />
-                    {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
+                  <div className="right num" style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 14 }}>{monthRange(r.start_date, r.end_date)}</p>
+                    <p className="mute" style={{ fontSize: 12 }}>{duration(monthsInclusive(r.start_date, r.end_date || nowMonth))}</p>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">🏆 Key Achievements (one per line)</label>
-                    <textarea
-                      {...register('achievements')}
-                      rows={5}
-                      placeholder="Increased sales by 20%&#10;Led team of 5 developers&#10;Implemented new CI/CD pipeline&#10;Reduced deployment time by 50%"
-                      className="form-textarea"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">🛠️ Technologies (comma-separated)</label>
-                    <input
-                      {...register('technologies')}
-                      type="text"
-                      placeholder="React, Node.js, PostgreSQL, Docker, AWS"
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    className="btn-success"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? (
-                      <div className="flex items-center">
-                        <div className="spinner w-4 h-4 mr-2"></div>
-                        Saving...
-                      </div>
-                    ) : (
-                      editingItem ? '✨ Update Experience' : '💼 Add Experience'
-                    )}
-                  </button>
-                </div>
-              </form>
+                  <button type="button" className="btn btn-text right" onClick={() => open(r)} aria-label={`Edit ${r.position} at ${r.company}`}>Edit</button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {!isLoading && shown.length === 0 ? (
+          <div style={{ padding: '0 24px 20px' }}>
+            <div className="empty-slot">
+              <span>{needle ? `No roles match “${q.trim()}”.` : 'No roles yet.'}</span>
+              <button type="button" className="btn btn-text" onClick={() => open(null)}>Add a role</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        ) : null}
+      </section>
+
+      {editId !== null ? (
+        <Dialog
+          title={editId === 'new' ? 'Add a role' : 'Edit role'}
+          sub="Shows on the Experience page and the CV."
+          onClose={close}
+          saving={save.isPending}
+          onSubmit={submit}
+          footer={
+            <>
+              {editId !== 'new' ? <button type="button" className="btn btn-neg first" onClick={() => setConfirming(true)}>Delete role</button> : null}
+              <button type="button" className="btn btn-line" onClick={close} disabled={save.isPending}>Cancel</button>
+              <SaveButton saving={save.isPending} label={editId === 'new' ? 'Add role' : 'Save changes'} />
+            </>
+          }
+        >
+          <div className="form">
+            <Field label="Position" error={err('position')}>{(p) => <input {...p} value={d.position} onChange={(e) => set('position', e.target.value)} />}</Field>
+            <Field label="Company" error={err('company')}>{(p) => <input {...p} value={d.company} onChange={(e) => set('company', e.target.value)} />}</Field>
+            <Field label="Location" error={err('location')}>{(p) => <input {...p} value={d.location} onChange={(e) => set('location', e.target.value)} />}</Field>
+            <Field label="Company website" error={err('url')}>{(p) => <input {...p} type="url" placeholder="https://" value={d.url} onChange={(e) => set('url', e.target.value)} />}</Field>
+            <Field label="Started" error={err('start')}>{(p) => <input {...p} type="month" value={d.start} onChange={(e) => set('start', e.target.value)} />}</Field>
+            <Field label="Ended" error={err('end')} hint={d.current ? 'Shows as “now” while this is your current role.' : 'Leave empty if you are still there.'}>
+              {(p) => <input {...p} type="month" value={d.current ? '' : d.end} disabled={d.current} onChange={(e) => set('end', e.target.value)} />}
+            </Field>
+            <div className="field span2" style={{ gap: 0 }}>
+              <Switch checked={d.current} onChange={(v) => setD((p) => ({ ...p, current: v, end: v ? '' : p.end }))}>
+                <span>
+                  <span style={{ display: 'block', fontWeight: 500 }}>I work here now</span>
+                  <span className="hint">Marks the role Current and shows it first.</span>
+                </span>
+              </Switch>
+            </div>
+            <Field label="What you did" span2 error={err('description')}>{(p) => <textarea {...p} rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} />}</Field>
+            <Field label="Key achievements" span2 error={err('achievements')} hint="One per line. Lead with the number where there is one.">
+              {(p) => <textarea {...p} rows={4} value={d.achievements} onChange={(e) => set('achievements', e.target.value)} />}
+            </Field>
+            <Field label="Impact highlights" span2 error={err('highlights')} hint="Short, number first, one per line. Shown as pills on the Experience page.">
+              {(p) => <textarea {...p} rows={3} value={d.highlights} onChange={(e) => set('highlights', e.target.value)} />}
+            </Field>
+            <Field label="Technologies" span2 error={err('techText')} hint="Separate with commas.">
+              {(p) => <input {...p} value={d.techText} onChange={(e) => set('techText', e.target.value)} />}
+            </Field>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {confirming && typeof editId === 'number' ? (
+        <ConfirmDialog
+          title={`Delete ${d.position} at ${d.company}?`}
+          description="It comes off the Experience page and the CV. This can't be undone."
+          confirmLabel="Delete role"
+          busy={remove.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => remove.mutate(editId)}
+        />
+      ) : null}
+    </>
   )
 }
-
-export default WorkHistory

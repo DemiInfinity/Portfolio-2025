@@ -1,0 +1,390 @@
+{
+  "_about": "Default data for cypress/support/frontend/mock-api.mjs. Shapes from handoffs H-9 to H-22. Rows with _pre=true look like they did before the v2 migration (no role/platform/case_study/feature_titles/has_case_study).",
+  "flags": { "open_to_work": true, "show_marbl": false, "maintenance_mode": false },
+  "resume": { "available": true, "url": "https://x/cv.pdf?v=1", "path": "site/cv/Demi-Taylor-Nimmo-CV.pdf", "name": "Demi-Taylor-Nimmo-CV.pdf", "size": 81234, "updatedAt": "2026-10-20T10:00:00.000Z" },
+  "projects": [
+    {
+      "id": 12,
+      "slug": "lunalore",
+      "title": "LunaLore",
+      "description": "A world-building companion for writers, on desktop and the web.",
+      "image": "/uploads/lunalore.svg",
+      "images": ["/uploads/luna-g1.svg"],
+      "technologies": ["Electron", "React", "Node.js", "PostgreSQL"],
+      "github_url": "https://github.com/DemiInfinity/lunalore",
+      "live_url": "https://lunalore.app",
+      "featured": true,
+      "date": "2025-03-01",
+      "status": "in_development",
+      "inspiration": null,
+      "role": "Solo: design, frontend, backend",
+      "platform": "Desktop app and web",
+      "show_on_site": true,
+      "created_at": "2025-03-01T10:00:00.000Z",
+      "updated_at": "2026-09-01T10:00:00.000Z",
+      "content": "## Legacy\nOld markdown that must not show when case_study exists.",
+      "case_study": {
+        "overview": "LunaLore keeps a writer's whole world in one place.",
+        "problem": "Writers juggle notes across **five apps**.",
+        "how_might_we": "How might we keep a whole fictional world in one calm place?",
+        "process": [
+          { "label": "Discover", "title": "Talking to creators", "body": "Interviews with 12 writers.", "image": "/uploads/p1.svg", "image_alt": "Interview notes" },
+          { "label": "Define", "title": "Mapping the mess", "body": "Affinity mapping.", "image": null, "image_alt": "" },
+          { "label": "Design", "title": "Sketching the shelf", "body": "Paper prototypes.", "image": null },
+          { "label": "Build", "title": "Shipping the beta", "body": "Electron and web from one codebase.", "image": null }
+        ],
+        "architecture": {
+          "summary": "One React codebase, two shells.",
+          "steps": [
+            { "title": "Electron app", "detail": "Desktop shell, offline cache" },
+            { "title": "Express API", "detail": "Auth and sync" },
+            { "title": "PostgreSQL", "detail": "Worlds, characters, timelines" }
+          ]
+        },
+        "features": [
+          { "title": "Character profiles", "body": "Everyone in one card.", "image": null, "image_alt": "" },
+          { "title": "Timelines", "body": "Drag events into order.", "image": null },
+          { "title": "Offline mode", "body": "Write anywhere.", "image": null }
+        ],
+        "challenges": [
+          { "title": "One desktop and web codebase", "solution": "A thin platform layer behind one interface." },
+          { "title": "Sync conflicts", "solution": "Last-writer-wins per field, with history." }
+        ],
+        "metrics": [
+          { "value": "30%", "label": "lower infrastructure costs" },
+          { "value": "12", "label": "writers interviewed" },
+          { "value": "2", "label": "platforms from one codebase" }
+        ],
+        "learned": "Small, boring tech choices made shipping possible."
+      }
+    },
+    {
+      "id": 7,
+      "slug": "marbl",
+      "title": "Marbl",
+      "description": "A habit tracker that feels like a jar of marbles.",
+      "image": "/uploads/marbl.svg",
+      "images": [],
+      "technologies": ["SwiftUI", "CloudKit"],
+      "github_url": null,
+      "live_url": null,
+      "featured": false,
+      "date": "2024-11-01",
+      "status": "completed",
+      "role": null,
+      "platform": null,
+      "show_on_site": true,
+      "created_at": "2024-11-01T10:00:00.000Z",
+      "updated_at": "2025-01-01T10:00:00.000Z",
+      "content": "## Overview\ntext\n\n## Build\nMore text.",
+      "case_study": null
+    },
+    {
+      "id": 5,
+      "slug": "sparky-venture",
+      "title": "Sparky Venture",
+      "description": "A pre-migration project row.",
+      "image": "/uploads/sparky.svg",
+      "images": [],
+      "technologies": ["Next.js", "Supabase"],
+      "github_url": "https://github.com/DemiInfinity/sparky",
+      "live_url": null,
+      "featured": false,
+      "date": "2024-05-01",
+      "status": "completed",
+      "created_at": "2024-05-01T10:00:00.000Z",
+      "updated_at": "2024-06-01T10:00:00.000Z",
+      "content": "## Overview\nBuilt fast.",
+      "_pre": true
+    },
+    {
+      "id": 3,
+      "slug": "rebel-verify",
+      "title": "Rebel Verify",
+      "description": "Identity checks without the paperwork.",
+      "image": "/uploads/rebel.svg",
+      "images": [],
+      "technologies": ["TypeScript", "Express"],
+      "github_url": null,
+      "live_url": "https://rebelverify.com",
+      "featured": false,
+      "date": "2024-01-01",
+      "status": "completed",
+      "role": "Lead developer",
+      "platform": "Web",
+      "show_on_site": true,
+      "created_at": "2024-01-01T10:00:00.000Z",
+      "updated_at": "2024-02-01T10:00:00.000Z",
+      "content": null,
+      "case_study": { "overview": "Checks in minutes.", "features": [ { "title": "Live ID scan" }, { "title": "Audit trail" } ] }
+    },
+    {
+      "id": 21,
+      "slug": "secret-idea",
+      "title": "Secret Idea",
+      "description": "An idea that must never show publicly (D-4).",
+      "image": null,
+      "images": [],
+      "technologies": [],
+      "featured": false,
+      "date": "2026-10-01",
+      "status": "ideas",
+      "show_on_site": true,
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "updated_at": "2026-10-01T10:00:00.000Z",
+      "case_study": null
+    },
+    {
+      "id": 22,
+      "slug": "hidden-thing",
+      "title": "Hidden Thing",
+      "description": "Show on site switched off (D-4).",
+      "image": null,
+      "images": [],
+      "technologies": [],
+      "featured": false,
+      "date": "2026-09-01",
+      "status": "completed",
+      "show_on_site": false,
+      "created_at": "2026-09-01T10:00:00.000Z",
+      "updated_at": "2026-09-01T10:00:00.000Z",
+      "case_study": null
+    }
+  ],
+  "blog": [
+    {
+      "id": 41,
+      "slug": "shipping-a-desktop-app",
+      "title": "Shipping a desktop app with Velopack",
+      "excerpt": "Auto-updates without tears.",
+      "content": "Intro paragraph.\n\n> Ship small, ship often.\n\n```ts\nconst answer = 42\n```\n\nSome `inline` code.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 6,
+      "category": "Desktop",
+      "tags": ["electron", "velopack"],
+      "featured": true,
+      "cover_image": "/uploads/b1.svg",
+      "publish_date": "2026-01-07T09:00:00.000Z",
+      "created_at": "2026-01-07T09:00:00.000Z"
+    },
+    {
+      "id": 42,
+      "slug": "postgres-row-level-security",
+      "title": "Row level security in practice",
+      "excerpt": "Policies that read like sentences.",
+      "content": "Body text.",
+      "author": null,
+      "read_time": 8,
+      "category": "Backend",
+      "tags": ["postgres"],
+      "featured": false,
+      "cover_image": null,
+      "publish_date": "2025-12-02T09:00:00.000Z",
+      "created_at": "2025-12-02T09:00:00.000Z"
+    },
+    {
+      "id": 43,
+      "slug": "design-tokens-that-scale",
+      "title": "Design tokens that scale",
+      "excerpt": "From Figma to CSS variables.",
+      "content": "Frontend body.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 5,
+      "category": "Frontend",
+      "tags": ["css"],
+      "featured": false,
+      "cover_image": null,
+      "publish_date": "2025-11-15T09:00:00.000Z",
+      "created_at": "2025-11-15T09:00:00.000Z"
+    },
+    {
+      "id": 44,
+      "slug": "accessible-modals",
+      "title": "Accessible modals from scratch",
+      "excerpt": "Focus traps, Escape and friends.",
+      "content": "Another frontend body.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 7,
+      "category": "Frontend",
+      "tags": ["a11y"],
+      "featured": false,
+      "cover_image": null,
+      "publish_date": "2025-10-01T09:00:00.000Z",
+      "created_at": "2025-10-01T09:00:00.000Z"
+    }
+  ],
+  "work_history": [
+    {
+      "id": 2,
+      "company": "Bright Labs",
+      "position": "Software Developer",
+      "location": "Newcastle",
+      "start_date": "2022-07-01",
+      "end_date": "2024-06-01",
+      "description": "Built internal tools.",
+      "achievements": ["Cut lookup time on calls by 60%."],
+      "technologies": ["C#", ".NET"],
+      "highlights": [],
+      "company_url": null
+    },
+    {
+      "id": 4,
+      "company": "Cintra",
+      "position": "Software Engineer",
+      "location": "Remote",
+      "start_date": "2025-08-01",
+      "end_date": null,
+      "description": "Desktop and web products.",
+      "achievements": ["Automated the application update process with Velopack, cutting manual effort by 80%."],
+      "technologies": ["Electron", "React"],
+      "highlights": ["−80% manual update effort"],
+      "company_url": "https://cintra.example.com"
+    },
+    {
+      "id": 1,
+      "company": "Teesside University",
+      "position": "Student Developer",
+      "location": "Middlesbrough",
+      "start_date": "2019-01-01",
+      "end_date": "2020-06-01",
+      "description": "Part-time web work.",
+      "achievements": ["Rebuilt the society website."],
+      "technologies": ["PHP"],
+      "highlights": [],
+      "company_url": null
+    },
+    {
+      "id": 3,
+      "company": "Freelance",
+      "position": "Freelance Developer",
+      "location": "Remote",
+      "start_date": "2024-06-01",
+      "end_date": "2024-08-01",
+      "description": "Short contracts.",
+      "achievements": ["Delivered two client sites."],
+      "technologies": ["Next.js"],
+      "company_url": null
+    }
+  ],
+  "education": [
+    {
+      "id": 1,
+      "institution": "Teesside University",
+      "degree": "BSc Computer Science",
+      "field_of_study": "Computer Science",
+      "start_date": "2016-09-01",
+      "end_date": "2020-06-01",
+      "description": "Software engineering and HCI.",
+      "gpa": "First Class Honours"
+    }
+  ],
+  "certifications": [
+    { "id": 1, "name": "AWS Certified Cloud Practitioner", "issuer": "Amazon Web Services", "issue_date": "2024-03-01", "credential_url": "https://aws.example.com/cred/1" }
+  ],
+  "learning": [
+    { "id": 1, "title": "Advanced TypeScript", "provider": "Udemy", "description": "Write safer generics", "progress": 19, "status": "in_progress", "start_date": "2026-01-01", "estimated_completion": "2026-12-01", "category": "Frontend" },
+    { "id": 2, "title": "Rust for web developers", "provider": "Frontend Masters", "description": "Ship a CLI", "progress": 18, "status": "in_progress", "start_date": "2026-02-01", "estimated_completion": null, "category": "Backend" },
+    { "id": 3, "title": "System design", "description": null, "progress": 15, "status": "in_progress", "start_date": "2026-03-01", "estimated_completion": "2027-01-01", "category": "Backend" },
+    { "id": 4, "title": "Swift concurrency", "provider": null, "description": "Async/await in apps", "progress": 1, "status": "in_progress", "start_date": "2026-10-01", "estimated_completion": null, "category": "Mobile" },
+    { "id": 5, "title": "Docker fundamentals", "provider": "Udemy", "description": "Containers", "progress": 100, "status": "completed", "start_date": "2025-01-01", "estimated_completion": "2025-03-01", "category": "DevOps" }
+  ],
+  "skills": [
+    { "id": 1, "name": "React", "category": "Frontend", "level": "expert", "description": "Daily driver" },
+    { "id": 2, "name": "Node.js", "category": "Backend", "level": "advanced", "description": "APIs and tooling" },
+    { "id": 3, "name": "Rust", "category": "Backend", "level": "beginner", "description": "Learning" }
+  ],
+  "about": {
+    "intro": [
+      "I’m a mock intro paragraph one, written for the e2e tests.",
+      "Mock paragraph two talks about **craft** and care."
+    ],
+    "looking_for": {
+      "summary": "Mock summary: a product team that ships.",
+      "items": [
+        { "label": "Role", "value": "Mock senior full-stack" },
+        { "label": "Where", "value": "Mock remote or Newcastle" }
+      ]
+    },
+    "open_to_work_off_line": "Mock off line: happily busy, say hi anyway",
+    "cv_headline": "Mock CV headline",
+    "cv_profile": "Mock CV profile paragraph.",
+    "cv_ai_workflow": "Mock AI workflow paragraph.",
+    "contact": {
+      "email": "demi.21@outlook.com",
+      "linkedin_url": "https://www.linkedin.com/in/demi-taylor-nimmo-bb320b40",
+      "github_url": "https://github.com/DemiInfinity",
+      "portfolio_url": "https://www.demitaylornimmo.com",
+      "location": "Newcastle upon Tyne"
+    },
+    "updated_at": "2026-10-20T10:00:00.000Z"
+  },
+  "recommendations": [
+    {
+      "id": 1,
+      "quote": "Demi is the developer every team hopes for.",
+      "full_text": "Full mock recommendation text that only shows when expanded.",
+      "name": "Adam Mellor",
+      "role": "Engineering Manager",
+      "company": "Cintra",
+      "relationship": "managed Demi directly",
+      "source": "LinkedIn",
+      "source_url": "https://www.linkedin.com/in/adam-example",
+      "date": "2026-04-01",
+      "show_on_cv": true,
+      "sort_order": 0,
+      "created_at": "2026-04-01T10:00:00.000Z",
+      "updated_at": "2026-04-01T10:00:00.000Z"
+    }
+  ],
+  "cv": {
+    "updated_at": "2026-10-20T10:00:00.000Z",
+    "experience": [
+      { "id": 4, "company": "Cintra", "position": "Software Engineer", "location": "Remote", "start_date": "2025-08-01", "end_date": null, "current": true, "description": "Desktop and web products.", "achievements": ["Automated the application update process with Velopack, cutting manual effort by 80%."], "technologies": ["Electron"], "highlights": ["−80% manual update effort"] },
+      { "id": 3, "company": "Freelance", "position": "Freelance Developer", "location": "Remote", "start_date": "2024-06-01", "end_date": "2024-08-01", "current": false, "description": "Short contracts.", "achievements": ["Delivered two client sites."], "technologies": [], "highlights": [] }
+    ],
+    "skills": [
+      { "category": "Frontend", "items": [ { "id": 1, "name": "React", "level": "expert" } ] },
+      { "category": "Backend", "items": [ { "id": 2, "name": "Node.js", "level": "advanced" }, { "id": 3, "name": "Rust", "level": "beginner" } ] }
+    ],
+    "projects": [
+      { "id": 12, "slug": "lunalore", "title": "LunaLore", "description": "A world-building companion.", "technologies": ["Electron", "React"] },
+      { "id": 7, "slug": "marbl", "title": "Marbl", "description": "Habit tracker.", "technologies": ["SwiftUI"] },
+      { "id": 3, "slug": "rebel-verify", "title": "Rebel Verify", "description": "Identity checks.", "technologies": ["TypeScript"] },
+      { "id": 5, "slug": "sparky-venture", "title": "Sparky Venture", "description": "Fourth project, must not be listed.", "technologies": [] }
+    ],
+    "education": [
+      { "id": 1, "institution": "Teesside University", "degree": "BSc Computer Science", "field_of_study": "Computer Science", "start_date": "2016-09-01", "end_date": "2020-06-01", "gpa": "First Class Honours" }
+    ],
+    "learning": [
+      { "id": 1, "title": "Advanced TypeScript", "provider": "Udemy", "description": "Write safer generics", "progress": 19, "status": "in_progress", "start_date": "2026-01-01", "estimated_completion": "2026-12-01" }
+    ],
+    "certifications": [],
+    "counts": { "experience": 2, "projects": 4 },
+    "profile": {
+      "cv_headline": "Mock CV headline",
+      "cv_profile": "Mock CV profile paragraph.",
+      "cv_ai_workflow": "Mock AI workflow paragraph.",
+      "contact": {
+        "email": "demi.21@outlook.com",
+        "linkedin_url": "https://www.linkedin.com/in/demi-taylor-nimmo-bb320b40",
+        "github_url": "https://github.com/DemiInfinity",
+        "portfolio_url": "https://www.demitaylornimmo.com",
+        "location": "Newcastle upon Tyne"
+      }
+    },
+    "recommendation": {
+      "id": 1,
+      "quote": "Demi is the developer every team hopes for.",
+      "full_text": null,
+      "name": "Adam Mellor",
+      "role": "Engineering Manager",
+      "company": "Cintra",
+      "relationship": "managed Demi directly",
+      "source": "LinkedIn",
+      "source_url": null,
+      "date": "2026-04-01",
+      "show_on_cv": true,
+      "sort_order": 0
+    }
+  }
+}

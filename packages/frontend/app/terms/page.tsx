@@ -44,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export function TermsOfUseContent({ showMarbl }: { showMarbl: boolean }) {
   return (
-    <LegalPage title="📜 Terms of Use" otherHref="/privacy" otherLabel="Privacy Policy">
+    <LegalPage title="Terms of Use" otherHref="/privacy" otherLabel="Privacy Policy">
       <p>
         {showMarbl
           ? 'These terms apply to this website and to mobile apps we publish, including Marbl and any other apps we list below.'

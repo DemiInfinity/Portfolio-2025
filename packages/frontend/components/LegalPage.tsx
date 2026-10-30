@@ -1,18 +1,9 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 export const LEGAL_CONTACT_EMAIL = 'demi.21@outlook.com'
 export const LEGAL_EFFECTIVE_DATE = '12 September 2026'
 export const LEGAL_SITE_URL = 'https://demitaylornimmo.com'
-
-const proseClass = [
-  'text-gray-800 leading-relaxed',
-  '[&_h2]:mt-10 [&_h2]:mb-4 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-gray-800',
-  '[&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-gray-800',
-  '[&_p]:mb-4 [&_p]:leading-relaxed',
-  '[&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6',
-  '[&_a]:font-medium [&_a]:text-pink-600 [&_a]:underline hover:[&_a]:text-purple-600',
-].join(' ')
 
 type LegalPageProps = {
   title: string
@@ -57,42 +48,27 @@ export function OurAppsList({ showMarbl }: { showMarbl: boolean }) {
   )
 }
 
+/** Legal pages in the Post reading column (720px, Playfair h2, 17px/1.75 body). */
 export default function LegalPage({ title, children, otherHref, otherLabel }: LegalPageProps) {
   return (
-    <div
-      className="min-h-screen py-20"
-      style={{ background: 'linear-gradient(135deg, #fff8f0 0%, #f8f4ff 50%, #fdf2f8 100%)' }}
-    >
-      <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <header className="mb-10">
-          <h1
-            className="text-4xl md:text-5xl font-bold gradient-text mb-4"
-            style={{ fontFamily: 'Playfair Display, serif' }}
-          >
-            {title}
-          </h1>
-          <p
-            className="text-sm text-gray-600 font-medium"
-            style={{ fontFamily: 'Poppins, sans-serif' }}
-          >
-            Effective date: {LEGAL_EFFECTIVE_DATE}
-          </p>
-        </header>
+    <article style={{ paddingBottom: 100 }}>
+      <header className="reading" style={{ paddingTop: 72, paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <h1 className="serif in" style={{ fontSize: 'clamp(40px, 5vw, 64px)', lineHeight: 1.08 }}>
+          {title}
+        </h1>
+        <p className="in" style={{ ['--d' as string]: '100ms', fontSize: 'var(--t-meta)', color: '#6b5a7e' } as CSSProperties}>
+          Effective date: {LEGAL_EFFECTIVE_DATE}
+        </p>
+      </header>
 
-        <div className={proseClass} style={{ fontFamily: 'Poppins, sans-serif' }}>
-          {children}
-        </div>
+      <div className="reading prose-dn">{children}</div>
 
-        <footer className="mt-12 pt-8 border-t border-pink-200 text-sm text-gray-600" style={{ fontFamily: 'Poppins, sans-serif' }}>
-          See also:{' '}
-          <Link
-            href={otherHref}
-            className="text-pink-600 hover:text-purple-600 underline font-medium"
-          >
-            {otherLabel}
-          </Link>
-        </footer>
-      </article>
-    </div>
+      <footer className="reading" style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid #e6dcf3', fontSize: 'var(--t-meta)' }}>
+        See also:{' '}
+        <Link href={otherHref} style={{ color: 'var(--b2)', fontWeight: 600 }}>
+          {otherLabel}
+        </Link>
+      </footer>
+    </article>
   )
 }

@@ -1,0 +1,103 @@
+[
+  {
+    "id": 200,
+    "slug": "alpha",
+    "title": "Alpha",
+    "description": "Alpha description",
+    "image": "/uploads/alpha.svg",
+    "images": [],
+    "technologies": [
+      "TypeScript",
+      "Node.js"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-01-01",
+    "status": "completed",
+    "created_at": "2025-03-01T10:00:00.000Z",
+    "updated_at": "2025-01-01T10:00:00.000Z",
+    "content": "## Overview\nx",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "feature_titles": [],
+    "case_study": null
+  },
+  {
+    "id": 201,
+    "slug": "beta",
+    "title": "Beta",
+    "description": "Beta description",
+    "image": "/uploads/beta.svg",
+    "images": [],
+    "technologies": [
+      "TypeScript",
+      "Node.js"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-01-01",
+    "status": "completed",
+    "created_at": "2025-02-01T10:00:00.000Z",
+    "updated_at": "2025-01-01T10:00:00.000Z",
+    "content": "## Overview\nx",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "feature_titles": [
+      "Live sync",
+      "Offline mode",
+      "Dark theme"
+    ],
+    "case_study": {
+      "overview": "o",
+      "features": [
+        {
+          "title": "Live sync"
+        },
+        {
+          "title": "Offline mode"
+        },
+        {
+          "title": "Dark theme"
+        }
+      ]
+    }
+  },
+  {
+    "id": 202,
+    "slug": "gamma",
+    "title": "Gamma",
+    "description": "Gamma description",
+    "image": "/uploads/gamma.svg",
+    "images": [],
+    "technologies": [
+      "TypeScript",
+      "Node.js"
+    ],
+    "github_url": null,
+    "live_url": null,
+    "featured": false,
+    "date": "2025-01-01",
+    "status": "completed",
+    "created_at": "2025-01-01T10:00:00.000Z",
+    "updated_at": "2025-01-01T10:00:00.000Z",
+    "content": "## Overview\nx",
+    "role": null,
+    "platform": null,
+    "show_on_site": true,
+    "feature_titles": [
+      "One feature"
+    ],
+    "case_study": {
+      "overview": "o",
+      "features": [
+        {
+          "title": "One feature"
+        }
+      ]
+    }
+  }
+]

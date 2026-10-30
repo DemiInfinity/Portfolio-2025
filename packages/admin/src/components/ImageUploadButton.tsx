@@ -1,10 +1,8 @@
 import { useRef, useState } from 'react'
-import { ImagePlus } from 'lucide-react'
 import { api } from '@/lib/api'
-import toast from 'react-hot-toast'
-
-const API_ORIGIN = ((import.meta as any).env.VITE_API_URL as string | undefined)?.replace(/\/$/, '')
-  || 'https://api.demitaylornimmo.com'
+import { API_ORIGIN } from '@/lib/config'
+import { apiError } from '@/lib/errors'
+import { useToast } from './ui/Toast'
 
 type Props = {
   onUploaded: (absoluteUrl: string) => void
@@ -12,9 +10,11 @@ type Props = {
   className?: string
 }
 
-export function ImageUploadButton({ onUploaded, label = 'Upload image', className = '' }: Props) {
+/** The "Upload" half of a `.joined` image URL field. Posts multipart `image` to /upload/image. */
+export function ImageUploadButton({ onUploaded, label = 'Upload', className = 'btn' }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const { say } = useToast()
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -25,18 +25,11 @@ export function ImageUploadButton({ onUploaded, label = 'Upload image', classNam
       formData.append('image', file)
       const res = await api.post('/upload/image', formData)
       const path = res.data?.data?.url as string | undefined
-      if (!path) {
-        throw new Error('No URL in response')
-      }
-      const absolute = path.startsWith('http') ? path : `${API_ORIGIN}${path}`
-      onUploaded(absolute)
-      toast.success('Image uploaded')
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-          : null
-      toast.error(message || 'Upload failed')
+      if (!path) throw new Error('No URL in response')
+      onUploaded(path.startsWith('http') ? path : `${API_ORIGIN}${path}`)
+      say('Image uploaded')
+    } catch (err) {
+      say(apiError(err, "Couldn't upload the image. Try again."))
     } finally {
       setUploading(false)
       e.target.value = ''
@@ -45,21 +38,9 @@ export function ImageUploadButton({ onUploaded, label = 'Upload image', classNam
 
   return (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleChange}
-      />
-      <button
-        type="button"
-        disabled={uploading}
-        onClick={() => inputRef.current?.click()}
-        className={`inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border-2 border-pink-200 bg-white text-pink-700 hover:bg-pink-50 transition-colors disabled:opacity-60 ${className}`}
-      >
-        <ImagePlus className="w-4 h-4" />
-        {uploading ? 'Uploading…' : label}
+      <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleChange} tabIndex={-1} aria-hidden="true" />
+      <button type="button" className={className} disabled={uploading} onClick={() => inputRef.current?.click()}>
+        {uploading ? 'Uploading' : label}
       </button>
     </>
   )

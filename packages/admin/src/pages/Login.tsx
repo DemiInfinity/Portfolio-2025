@@ -1,140 +1,116 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { Eye, EyeOff } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { SITE_URL } from '@/lib/config'
 
-interface LoginForm {
-  email: string
-  password: string
-}
+import { EMAIL_RE } from '@/lib/validation'
 
-const Login = () => {
+export default function Login() {
   const { login } = useAuth()
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
+  const [email, setEmail] = useState('')
+  const [pw, setPw] = useState('')
+  const [show, setShow] = useState(false)
+  const [tried, setTried] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const pwRef = useRef<HTMLInputElement>(null)
 
-  const onSubmit = async (data: LoginForm) => {
-    setLoading(true)
+  const emailBad = tried && !EMAIL_RE.test(email)
+  const pwBad = tried && pw.length === 0
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setTried(true)
+    setFailed(false)
+    if (!EMAIL_RE.test(email) || pw.length === 0) return
+    setBusy(true)
     try {
-      await login(data.email, data.password)
-      toast.success('Login successful!')
-    } catch (error) {
-      // Error is handled by the API interceptor
+      await login(email, pw)
+    } catch {
+      setFailed(true)
+      setPw('')
+      setTried(false)
+      pwRef.current?.focus()
     } finally {
-      setLoading(false)
+      setBusy(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" 
-         style={{ background: 'linear-gradient(135deg, #f8f4ff 0%, #fff8f0 50%, #ffb3ba 100%)' }}>
-      {/* Decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-10 left-10 text-6xl opacity-20">💖</div>
-        <div className="absolute top-32 right-20 text-4xl opacity-15">✨</div>
-        <div className="absolute bottom-20 left-20 text-5xl opacity-10">🌸</div>
-        <div className="absolute bottom-32 right-10 text-3xl opacity-20">💫</div>
-      </div>
-      
-      <div className="max-w-md w-full space-y-8 relative z-10">
-        <div className="card text-center p-8">
-          <div className="mx-auto mb-4 flex justify-center">
-            <img
-              src="/brand-logo.png"
-              alt="Demi Taylor Nimmo"
-              className="h-20 sm:h-24 w-auto max-w-[220px] object-contain"
-            />
-          </div>
-          <h2 className="mt-6 text-center text-4xl font-bold gradient-text" style={{ fontFamily: 'Dancing Script, cursive' }}>
-            ✨ Portfolio Admin
-          </h2>
-          <p className="mt-3 text-center text-sm text-gray-600">
-            Sign in to manage your beautiful portfolio content 💖
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6 form-girly" onSubmit={handleSubmit(onSubmit)}>
-          <div className="card p-6 space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                ✉️ Email address
-              </label>
+    <>
+      <header style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '0 29px', borderBottom: '1px solid #ece4f5' }}>
+        <a href={SITE_URL} aria-label="Demi Taylor Nimmo, view site" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+          <img src="/logo.svg" alt="" width={128} height={72} style={{ height: 24, width: 'auto' }} />
+          <span className="ad-word">Demi</span>
+          <span className="mute" style={{ fontSize: 13 }}>Admin</span>
+        </a>
+        <a className="btn btn-text" href={SITE_URL}>Back to the site</a>
+      </header>
+
+      <main className="lg">
+        <div className="card" style={{ padding: 32 }}>
+          <h1 className="ad-title">Sign in</h1>
+          <p className="ad-sub">Edit the projects, posts and roles on demitaylornimmo.com.</p>
+          <form onSubmit={submit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
+            <div className="field">
+              <label htmlFor="lg-email">Email</label>
               <input
-                {...register('email', { 
-                  required: 'Email is required',
-                  pattern: {
-                    value: /^\S+@\S+$/i,
-                    message: 'Invalid email address'
-                  }
-                })}
+                id="lg-email"
+                className={'input' + (emailBad ? ' err' : '')}
                 type="email"
-                autoComplete="email"
-                className="input-girly"
-                placeholder="Enter your email"
+                autoComplete="username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={emailBad}
+                aria-describedby={emailBad ? 'lg-email-msg' : undefined}
               />
-              {errors.email && (
-                <p className="mt-2 text-sm text-pink-600 font-medium">{errors.email.message}</p>
-              )}
+              {emailBad ? <span id="lg-email-msg" className="err-text">Enter the email you sign in with, like name@example.com.</span> : null}
             </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                🔐 Password
-              </label>
-              <div className="relative">
-                <input
-                  {...register('password', { 
-                    required: 'Password is required',
-                    minLength: {
-                      value: 6,
-                      message: 'Password must be at least 6 characters'
-                    }
-                  })}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  className="input-girly pr-12"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center hover:text-pink-600 transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
+            <div className="field">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <label htmlFor="lg-pw">Password</label>
+                <button type="button" className="btn btn-text" onClick={() => setShow(!show)} aria-pressed={show} style={{ minHeight: 32, padding: '0 10px', fontSize: 13 }}>
+                  {show ? 'Hide' : 'Show'}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-2 text-sm text-pink-600 font-medium">{errors.password.message}</p>
-              )}
+              <input
+                ref={pwRef}
+                id="lg-pw"
+                className={'input' + (pwBad ? ' err' : '')}
+                type={show ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                aria-invalid={pwBad}
+                aria-describedby={pwBad ? 'lg-pw-msg' : failed ? 'lg-fail' : undefined}
+              />
+              {pwBad ? <span id="lg-pw-msg" className="err-text">Enter your password.</span> : null}
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full py-3 text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Signing in...
-                </span>
-              ) : (
-                'Sign in ✨'
-              )}
+            {failed ? <p id="lg-fail" className="err-text" role="alert">That email and password don't match. Try again.</p> : null}
+            <button type="submit" className="btn btn-primary" disabled={busy} style={{ marginTop: 8 }}>
+              {busy ? <span className="spin" aria-hidden="true" /> : null}
+              {busy ? 'Signing in' : 'Sign in'}
             </button>
-          </div>
+          </form>
+          <p className="mute" style={{ fontSize: 13, marginTop: 20 }}>Only the site owner has an account.</p>
+        </div>
 
-        </form>
-      </div>
-    </div>
+        <figure className="lg-shot" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ border: '1px solid #ece4f5', borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #ece4f5', background: '#f8f4fc' }}>
+              <span style={{ padding: '3px 12px', borderRadius: 99, background: '#fff', border: '1px solid #ece4f5', fontSize: 12 }}>demitaylornimmo.com</span>
+              <span className="pill p-live" style={{ marginLeft: 'auto' }}><span className="dot" />Live</span>
+            </div>
+            <img
+              src="/login-site.jpg"
+              alt="The live portfolio home page: a 3D full-stack hero beside Demi's name in pink script"
+              width={1440}
+              height={900}
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
+          </div>
+          <figcaption className="mute" style={{ fontSize: 13 }}>Everything you change here shows on the live site straight away. The CV regenerates from it.</figcaption>
+        </figure>
+      </main>
+    </>
   )
 }
-
-export default Login

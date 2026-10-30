@@ -1,43 +1,37 @@
 import axios from 'axios'
-
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL 
-  ? `${(import.meta as any).env.VITE_API_URL}/api` 
-  : 'https://api.demitaylornimmo.com/api'
+import { API_ORIGIN } from './config'
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_ORIGIN}/api`,
   timeout: 10000,
 })
 
-// Request interceptor
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
+let onUnauthorized: (() => void) | null = null
 
-// Response interceptor
-api.interceptors.response.use(
-  (response) => {
-    return response
-  },
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token')
-      window.location.href = '/login'
-    }
-    
-    const message = error.response?.data?.error || 'An error occurred'
-    // Note: toast removed since it's not imported
-    console.error('API Error:', message)
-    
-    return Promise.reject(error)
+/** The auth context registers how a 401 signs the user out (no page reload). */
+export const setUnauthorizedHandler = (fn: (() => void) | null) => {
+  onUnauthorized = fn
+}
+
+// Paths whose 401 is handled by the caller (a wrong password on sign in, or the auth calls themselves).
+const SELF_HANDLED = /\/auth\/(login|logout|me)$/
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
   }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const url: string = error.config?.url || ''
+    if (error.response?.status === 401 && !SELF_HANDLED.test(url)) {
+      localStorage.removeItem('auth_token')
+      onUnauthorized?.()
+    }
+    return Promise.reject(error)
+  },
 )

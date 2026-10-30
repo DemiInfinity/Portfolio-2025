@@ -1,12 +1,7 @@
 import request from 'supertest'
 import express from 'express'
 import projectsRouter from '../projects'
-import { getServices } from '../../services'
-
-// Mock services
-jest.mock('../../services', () => ({
-  getServices: jest.fn(),
-}))
+import { mockServices } from '../../test/supabaseMock'
 
 describe('Projects API', () => {
   let app: express.Application
@@ -17,54 +12,48 @@ describe('Projects API', () => {
     app.use('/api/projects', projectsRouter)
   })
 
-  describe('GET /api/projects', () => {
-    it('should return list of projects', async () => {
-      const mockProjects = [
-        {
-          id: 1,
-          title: 'Test Project',
-          description: 'Test Description',
-          technologies: ['React', 'TypeScript'],
-        },
-      ]
+  afterEach(() => jest.restoreAllMocks())
 
-      ;(getServices as jest.Mock).mockReturnValue({
-        supabaseService: {
-          getClient: jest.fn().mockReturnValue({
-            from: jest.fn().mockReturnValue({
-              select: jest.fn().mockReturnValue({
-                order: jest.fn().mockReturnValue({
-                  data: mockProjects,
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        },
+  describe('GET /api/projects', () => {
+    it('returns every project, featured first, with array fields parsed', async () => {
+      mockServices({
+        tables: {
+          projects: [
+            {
+              id: 1,
+              title: 'Older',
+              slug: 'older',
+              technologies: '["React","TypeScript"]',
+              images: null,
+              featured: false,
+              created_at: '2025-01-01T00:00:00.000Z'
+            },
+            {
+              id: 2,
+              title: 'Spotlight',
+              slug: 'spotlight',
+              technologies: ['Electron'],
+              images: '["a.png"]',
+              featured: true,
+              created_at: '2024-01-01T00:00:00.000Z'
+            }
+          ]
+        }
       })
 
       const response = await request(app).get('/api/projects')
 
       expect(response.status).toBe(200)
       expect(response.body.success).toBe(true)
-      expect(response.body.data).toBeDefined()
+      expect(response.body.data).toHaveLength(2)
+      expect(response.body.data[0].id).toBe(2)
+      expect(response.body.data[0].images).toEqual(['a.png'])
+      expect(response.body.data[1].technologies).toEqual(['React', 'TypeScript'])
+      expect(response.body.data[1].images).toEqual([])
     })
 
-    it('should handle errors gracefully', async () => {
-      ;(getServices as jest.Mock).mockReturnValue({
-        supabaseService: {
-          getClient: jest.fn().mockReturnValue({
-            from: jest.fn().mockReturnValue({
-              select: jest.fn().mockReturnValue({
-                order: jest.fn().mockReturnValue({
-                  data: null,
-                  error: { message: 'Database error' },
-                }),
-              }),
-            }),
-          }),
-        },
-      })
+    it('returns 500 with success:false when the query fails', async () => {
+      mockServices({ errors: { projects: { message: 'Database error' } } })
 
       const response = await request(app).get('/api/projects')
 
@@ -73,4 +62,3 @@ describe('Projects API', () => {
     })
   })
 })
-

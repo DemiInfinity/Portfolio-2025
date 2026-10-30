@@ -3,6 +3,8 @@ import { body, validationResult } from 'express-validator'
 import { Request, Response } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { markCvDirty } from '../services/cvDirty'
+import { optionalText } from '../utils/validation'
 
 const router = express.Router()
 
@@ -35,7 +37,7 @@ router.get('/', async (req: Request, res: Response) => {
 // Get skills by category (public)
 router.get('/category/:category', async (req: Request, res: Response) => {
   try {
-    const { category } = req.params
+    const category = String(req.params.category)
     const { supabaseService } = getServices()
     const { data: skills, error } = await supabaseService.getClient()
       .from('skills')
@@ -91,6 +93,7 @@ router.post('/', [
       description: skillDescription
     })
 
+    await markCvDirty()
     return res.status(201).json({
       success: true,
       data: newSkill
@@ -111,7 +114,7 @@ router.put('/:id', [
   body('name').optional().isLength({ min: 1 }).trim(),
   body('category').optional().isLength({ min: 1 }).trim(),
   body('level').optional().isIn(['beginner', 'intermediate', 'advanced', 'expert']),
-  body('description').optional().isLength({ min: 1 }).trim()
+  body('description').optional({ nullable: true }).custom((v) => typeof v === 'string').withMessage('Description must be text')
 ], async (req: AuthRequest, res: Response) => {
   try {
     const errors = validationResult(req)
@@ -123,7 +126,7 @@ router.put('/:id', [
       })
     }
 
-    const { id } = req.params
+    const id = String(req.params.id)
     const updateData = req.body
     const { supabaseService } = getServices()
 
@@ -137,7 +140,16 @@ router.put('/:id', [
       })
     }
 
-    const updatedSkill = await supabaseService.update('skills', id, updateData)
+    // Only known fields; an empty description clears it.
+    const payload: Record<string, any> = {}
+    if (updateData.name !== undefined) payload.name = String(updateData.name).trim()
+    if (updateData.category !== undefined) payload.category = String(updateData.category).trim()
+    if (updateData.level !== undefined) payload.level = updateData.level
+    if ('description' in updateData) payload.description = optionalText(updateData.description)
+    payload.updated_at = new Date().toISOString()
+
+    const updatedSkill = await supabaseService.update('skills', id, payload)
+    await markCvDirty()
 
     return res.json({
       success: true,
@@ -155,7 +167,7 @@ router.put('/:id', [
 // Delete skill (admin only)
 router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = String(req.params.id)
     const { supabaseService } = getServices()
 
     // Check if skill exists
@@ -169,6 +181,7 @@ router.delete('/:id', [authenticate, authorize('admin')], async (req: AuthReques
     }
 
     await supabaseService.delete('skills', id)
+    await markCvDirty()
 
     return res.json({
       success: true,

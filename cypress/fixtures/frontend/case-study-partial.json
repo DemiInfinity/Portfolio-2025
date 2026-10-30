@@ -1,0 +1,15 @@
+{
+  "overview": "Partial overview text.",
+  "problem": "Partial problem text.",
+  "process": [
+    { "label": "One", "title": "Phase one" },
+    { "label": "Two", "title": "Phase two" },
+    { "label": "Three", "title": "Phase three" },
+    { "label": "Four", "title": "Phase four" }
+  ],
+  "metrics": [
+    { "value": "1", "label": "first metric" },
+    { "value": "2", "label": "second metric" },
+    { "value": "3", "label": "third metric" }
+  ]
+}

@@ -1,496 +1,370 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { api } from '@/lib/api'
-import { Plus, Edit, Trash2, Eye } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { apiError, fieldErrors } from '@/lib/errors'
+import { commas, dayOf, fmtDay, isoDay, slugify, toArray } from '@/lib/format'
+import { useQ } from '@/hooks/useQ'
+import { useEditParam } from '@/hooks/useEditParam'
+import Dialog, { SaveButton } from '@/components/ui/Dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Field from '@/components/ui/Field'
+import Switch from '@/components/ui/Switch'
+import Segmented from '@/components/ui/Segmented'
+import Icon from '@/components/ui/Icon'
+import { SkeletonRows } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 import { ImageUploadButton } from '@/components/ImageUploadButton'
 
-interface BlogPost {
+export interface BlogPost {
   id: number
   title: string
   slug: string
   excerpt: string
-  content: string
-  author: string
-  publish_date: string
-  read_time: number
-  category: string
+  content?: string
+  author?: string
+  publish_date?: string
+  created_at?: string
+  read_time?: number
+  category?: string
   tags: string[]
   featured: boolean
   published: boolean
   cover_image?: string | null
 }
 
-interface BlogForm {
-  title: string
-  slug: string
-  excerpt: string
-  content: string
-  author: string
-  publish_date: string
-  read_time: number
-  category: string
-  tags: string
-  featured: boolean
-  published: boolean
-  cover_image: string
+type Draft = { title: string; slug: string; excerpt: string; cover: string; content: string; category: string; mins: string; tags: string; author: string; date: string; featured: boolean; published: boolean }
+type Filter = 'all' | 'pub' | 'draft'
+
+export const BLOG_KEY = ['blog'] as const
+
+export const fetchPosts = async (): Promise<BlogPost[]> => {
+  const res = await api.get('/blog/admin/all')
+  return ((res.data?.data || []) as BlogPost[]).map((p) => ({ ...p, tags: toArray(p.tags), publish_date: p.publish_date || p.created_at }))
 }
 
-const Blog = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
-  const queryClient = useQueryClient()
+export const wordCount = (t: string) => t.split(/\s+/).filter(Boolean).length
+export const readMins = (words: number) => Math.max(1, Math.round(words / 220))
 
-  const { data: posts, isLoading } = useQuery({
-    queryKey: ['blog-posts'],
-    queryFn: async () => {
-      const response = await api.get('/blog/admin/all')
-      return response.data.data as BlogPost[]
-    }
-  })
+/** Newest published first. */
+export const publishedNewestFirst = (posts: BlogPost[]) =>
+  posts.filter((p) => p.published).sort((a, b) => (dayOf(a.publish_date) < dayOf(b.publish_date) ? 1 : -1))
 
-  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<BlogForm>()
+const newDraft = (): Draft => ({ title: '', slug: '', excerpt: '', cover: '', content: '', category: '', mins: '5', tags: '', author: 'Demi Taylor Nimmo', date: isoDay(new Date()), featured: false, published: false })
 
-  const createMutation = useMutation({
-    mutationFn: (data: BlogForm) => api.post('/blog', {
-      ...data,
-      tags: data.tags.split(',').map(t => t.trim()).filter(t => t)
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
-      toast.success('Blog post created successfully')
-      setIsModalOpen(false)
-      reset()
+const toDraft = (p: BlogPost): Draft => ({
+  title: p.title || '',
+  slug: p.slug || '',
+  excerpt: p.excerpt || '',
+  cover: p.cover_image || '',
+  content: p.content || '',
+  category: p.category || '',
+  mins: String(p.read_time ?? ''),
+  tags: p.tags.join(', '),
+  author: p.author || 'Demi Taylor Nimmo',
+  date: dayOf(p.publish_date),
+  featured: !!p.featured,
+  published: !!p.published,
+})
+
+const toBody = (d: Draft) => ({
+  title: d.title.trim(),
+  slug: d.slug.trim() || slugify(d.title),
+  excerpt: d.excerpt.trim(),
+  content: d.content,
+  category: d.category.trim(),
+  read_time: Number(d.mins) || readMins(wordCount(d.content)),
+  tags: commas(d.tags),
+  author: d.author.trim() || 'Demi Taylor Nimmo',
+  publish_date: d.date || undefined,
+  cover_image: d.cover.trim() || null,
+  featured: d.featured,
+  published: d.published,
+})
+
+const PATH: Record<string, keyof Draft> = { title: 'title', slug: 'slug', excerpt: 'excerpt', content: 'content', category: 'category', read_time: 'mins', tags: 'tags', author: 'author', publish_date: 'date', cover_image: 'cover' }
+
+const GRID = 'minmax(0, 1fr) 120px 100px 120px 80px'
+
+export default function Blog() {
+  const qc = useQueryClient()
+  const { say } = useToast()
+  const [q, setQ] = useQ()
+  const [params, setParams] = useSearchParams()
+  const [filter, setFilter] = useState<Filter>('all')
+  const { data: posts, isLoading } = useQuery({ queryKey: BLOG_KEY, queryFn: fetchPosts })
+
+  const [editId, setEditId] = useState<number | 'new' | null>(null)
+  const [d, setD] = useState<Draft>(newDraft)
+  const [tab, setTab] = useState<'write' | 'preview'>('write')
+  const [tried, setTried] = useState(false)
+  const [serverErr, setServerErr] = useState<Record<string, string>>({})
+  const [confirming, setConfirming] = useState(false)
+
+  const open = (p: BlogPost | null) => {
+    setEditId(p ? p.id : 'new')
+    setD(p ? toDraft(p) : newDraft())
+    setTab('write')
+    setTried(false)
+    setServerErr({})
+    setConfirming(false)
+  }
+  const close = () => setEditId(null)
+  useEditParam(posts, open)
+
+  // ?new=1 (from the Dashboard's "Write a post") opens the new-post dialog, then the param goes.
+  const wantsNew = params.get('new') === '1'
+  useEffect(() => {
+    if (!wantsNew) return
+    open(null)
+    setParams((p) => {
+      const n = new URLSearchParams(p)
+      n.delete('new')
+      return n
+    }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsNew])
+
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setD((p) => {
+      const next = { ...p, [k]: v }
+      if (k === 'title' && editId === 'new') next.slug = slugify(String(v))
+      return next
+    })
+    setServerErr((e) => ({ ...e, [k]: '' }))
+  }
+
+  const clientErr = (k: keyof Draft): string | null => {
+    if (!tried) return null
+    if (k === 'title' && !d.title.trim()) return 'Give the post a title.'
+    if (!d.published) return null
+    if (k === 'excerpt' && !d.excerpt.trim()) return 'Add an excerpt.'
+    if (k === 'content' && !d.content.trim()) return 'Write the post before publishing.'
+    if (k === 'category' && !d.category.trim()) return 'Add a category.'
+    return null
+  }
+  const err = (k: keyof Draft) => clientErr(k) || serverErr[k] || null
+
+  const save = useMutation({
+    mutationFn: (draft: Draft) => (editId === 'new' ? api.post('/blog', toBody(draft)) : api.put(`/blog/${editId}`, toBody(draft))),
+    onSuccess: (_r, draft) => {
+      qc.invalidateQueries({ queryKey: BLOG_KEY })
+      close()
+      say(draft.published ? `Published “${draft.title.trim().split(':')[0]}”` : 'Draft saved')
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.error || 'Failed to create blog post'
-      toast.error(message)
-    }
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: BlogForm }) => api.put(`/blog/${id}`, {
-      ...data,
-      tags: data.tags.split(',').map(t => t.trim()).filter(t => t)
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
-      toast.success('Blog post updated successfully')
-      setIsModalOpen(false)
-      setEditingPost(null)
-      reset()
+    onError: (e) => {
+      const mapped: Record<string, string> = {}
+      for (const [p, m] of Object.entries(fieldErrors(e))) if (PATH[p]) mapped[PATH[p]] = m
+      if (Object.keys(mapped).length) {
+        setServerErr(mapped)
+        if (mapped.content) setTab('write')
+      } else say(apiError(e))
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.error || 'Failed to update blog post'
-      toast.error(message)
-    }
   })
 
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/blog/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['blog-posts'] })
-      toast.success('Blog post deleted successfully')
+      qc.invalidateQueries({ queryKey: BLOG_KEY })
+      setConfirming(false)
+      close()
+      say('Post deleted')
     },
-    onError: (error: any) => {
-      const message = error.response?.data?.error || 'Failed to delete blog post'
-      toast.error(message)
-    }
+    onError: (e) => {
+      setConfirming(false)
+      say(apiError(e, "Couldn't delete. Try again."))
+    },
   })
 
-  const onSubmit = (data: BlogForm) => {
-    if (editingPost) {
-      updateMutation.mutate({ id: editingPost.id, data })
-    } else {
-      createMutation.mutate(data)
+  const submit = () => {
+    setTried(true)
+    const bad = !d.title.trim() || (d.published && (!d.excerpt.trim() || !d.content.trim() || !d.category.trim()))
+    if (bad) {
+      if (d.published && !d.content.trim()) setTab('write')
+      return
     }
+    save.mutate(d)
   }
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  }
+  const all = posts || []
+  const needle = q.trim().toLowerCase()
+  const inQ = all.filter((p) => !needle || [p.title, p.category || '', ...p.tags].join(' ').toLowerCase().includes(needle))
+  const shown = inQ.filter((p) => filter === 'all' || (filter === 'pub' ? p.published : !p.published))
+  const pubCount = all.filter((p) => p.published).length
+  const latest = publishedNewestFirst(all)[0]
+  const words = wordCount(d.content)
 
-  const openModal = (post?: BlogPost) => {
-    if (post) {
-      setEditingPost(post)
-      // Format publish_date for date input
-      const formattedDate = post.publish_date ? new Date(post.publish_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-      
-      reset({
-        title: post.title || '',
-        slug: post.slug || '',
-        excerpt: post.excerpt || '',
-        content: post.content || '',
-        author: post.author || 'Admin',
-        publish_date: formattedDate,
-        read_time: post.read_time || 5,
-        category: post.category || '',
-        tags: Array.isArray(post.tags) ? post.tags.join(', ') : '',
-        featured: post.featured || false,
-        published: post.published || false,
-        cover_image: post.cover_image || ''
-      })
-    } else {
-      setEditingPost(null)
-      reset({
-        title: '',
-        slug: '',
-        excerpt: '',
-        content: '',
-        author: 'Admin',
-        publish_date: new Date().toISOString().split('T')[0],
-        read_time: 5,
-        category: '',
-        tags: '',
-        featured: false,
-        published: false,
-        cover_image: ''
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const closeModal = () => {
-    setIsModalOpen(false)
-    setEditingPost(null)
-    reset()
-  }
-
-  // Auto-generate slug from title
-  const handleTitleChange = (title: string) => {
-    if (!editingPost) {
-      setValue('slug', generateSlug(title))
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="spinner mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your amazing blog posts... 📝</p>
-        </div>
-      </div>
-    )
-  }
+  const saveLabel = d.published ? (editId === 'new' ? 'Publish post' : 'Save changes') : 'Save draft'
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <>
+      <div className="ad-head">
         <div>
-          <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>📝 Blog Posts</h1>
-          <p className="mt-2 text-gray-600 font-medium">
-            Manage your beautiful articles and publications ✨
+          <h1 className="ad-title">Blog</h1>
+          <p className="ad-sub">
+            {posts ? `${pubCount} published, ${all.length - pubCount} drafts.${latest ? ` Latest: ${fmtDay(latest.publish_date)}.` : ''}` : ' '}
           </p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="btn-primary floating-hearts"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Post
+        <button type="button" className="btn btn-primary" onClick={() => open(null)}>
+          <Icon name="plus" size={16} />
+          New post
         </button>
       </div>
 
-      {/* Posts Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {posts?.map((post) => (
-          <div key={post.id} className="card p-6 hover:scale-105 transition-all duration-300">
-            <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
-              {post.cover_image ? (
-                <img src={post.cover_image} alt={post.title} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-4xl opacity-50">📝</span>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-lg font-semibold text-gray-800 line-clamp-2" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  {post.title}
-                </h3>
-                {post.featured && (
-                  <span className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-full whitespace-nowrap">
-                    ⭐ Featured
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                  post.published
-                    ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-white'
-                    : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white'
-                }`}>
-                  {post.published ? '🚀 Published' : '📝 Draft'}
-                </span>
-                <span className="text-xs text-pink-600 font-medium">⏱️ {post.read_time} min read</span>
-              </div>
-              <p className="text-sm text-gray-600 line-clamp-3 font-medium">
-                {post.excerpt}
-              </p>
-              <div className="flex items-center text-sm text-pink-600 gap-3">
-                <span className="truncate">📂 {post.category}</span>
-                <span className="text-gray-400">•</span>
-                <span className="truncate">
-                  📅 {post.publish_date ? new Date(post.publish_date).toLocaleDateString() : 'Date not available'}
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {post.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
-                    {tag}
-                  </span>
-                ))}
-                {post.tags.length > 3 && (
-                  <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded-full font-medium">
-                    +{post.tags.length - 3} more
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex space-x-3">
-                  {post.published && (
-                    <a
-                      href={`https://demitaylornimmo.com/blog/${post.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
-                      title="View Post"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                <button
-                  onClick={() => openModal(post)}
-                  className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                >
-                  <Edit className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm('Are you sure you want to delete this blog post? 💔')) {
-                      deleteMutation.mutate(post.id)
-                    }
-                  }}
-                  className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="toolbar">
+        <div className="search">
+          <label className="sr" htmlFor="bl-q">Search posts</label>
+          <Icon name="search" size={16} />
+          <input id="bl-q" className="input" type="search" placeholder="Title, category or tag" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Segmented
+          aria-label="Filter by status"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All', count: inQ.length },
+            { value: 'pub', label: 'Published', count: inQ.filter((p) => p.published).length },
+            { value: 'draft', label: 'Drafts', count: inQ.filter((p) => !p.published).length },
+          ]}
+        />
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="modal-overlay fixed inset-0" onClick={closeModal}></div>
-            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="modal-header">
-                  <h3 className="text-xl font-bold">
-                    {editingPost ? '✨ Edit Blog Post' : '📝 Create Blog Post'}
-                  </h3>
-                </div>
-                <div className="modal-body max-h-[60vh] overflow-y-auto">
-                  <div className="space-y-5">
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <div className="form-group">
-                        <label className="form-label">📝 Blog Title</label>
-                        <input
-                          {...register('title', { 
-                            required: 'Title is required',
-                            onChange: (e) => handleTitleChange(e.target.value)
-                          })}
-                          type="text"
-                          className="form-input"
-                          placeholder="My Amazing Blog Post"
-                        />
-                        {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">🔗 URL Slug</label>
-                        <input
-                          {...register('slug', { 
-                            required: 'Slug is required',
-                            pattern: {
-                              value: /^[a-z0-9-]+$/,
-                              message: 'Slug can only contain lowercase letters, numbers, and hyphens'
-                            }
-                          })}
-                          type="text"
-                          className="form-input"
-                          placeholder="my-amazing-blog-post"
-                        />
-                        {errors.slug && <p className="text-red-500 text-sm mt-1">{errors.slug.message}</p>}
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">📊 Excerpt</label>
-                      <textarea
-                        {...register('excerpt', { required: 'Excerpt is required' })}
-                        rows={3}
-                        className="form-textarea"
-                        placeholder="A brief summary of your blog post..."
-                      />
-                      {errors.excerpt && <p className="text-red-500 text-sm mt-1">{errors.excerpt.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🖼️ Cover image URL (optional)</label>
-                      <p className="text-sm text-gray-500 mb-2">Shown at the top of the post and in social previews.</p>
-                      <input
-                        {...register('cover_image')}
-                        type="url"
-                        className="form-input"
-                        placeholder="https://… or upload below"
-                      />
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <ImageUploadButton
-                          label="Upload → set cover"
-                          onUploaded={(url) => setValue('cover_image', url)}
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">✍️ Content</label>
-                      <p className="text-sm text-gray-500 mb-2">
-                        Markdown supported. Inline images: <code className="bg-pink-50 px-1 rounded">![description](image URL)</code>
-                      </p>
-                      <textarea
-                        {...register('content', { required: 'Content is required' })}
-                        rows={15}
-                        className="form-textarea"
-                        placeholder="Write your amazing blog post content here... (Markdown supported) ✨"
-                      />
-                      {errors.content && <p className="text-red-500 text-sm mt-1">{errors.content.message}</p>}
-                      <div className="mt-2">
-                        <ImageUploadButton
-                          label="Upload → insert image in content"
-                          onUploaded={(url) => {
-                            const cur = getValues('content') || ''
-                            setValue('content', `${cur}\n\n![](${url})\n`)
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                      <div className="form-group">
-                        <label className="form-label">👩‍💻 Author</label>
-                        <input
-                          {...register('author', { required: 'Author is required' })}
-                          type="text"
-                          className="form-input"
-                          placeholder="Demi Taylor Nimmo"
-                        />
-                        {errors.author && <p className="text-red-500 text-sm mt-1">{errors.author.message}</p>}
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">📂 Category</label>
-                        <input
-                          {...register('category', { required: 'Category is required' })}
-                          type="text"
-                          className="form-input"
-                          placeholder="Technology, Tutorial, etc."
-                        />
-                        {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category.message}</p>}
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">⏱️ Read Time (minutes)</label>
-                        <input
-                          {...register('read_time', { 
-                            required: 'Read time is required',
-                            min: { value: 1, message: 'Read time must be at least 1 minute' }
-                          })}
-                          type="number"
-                          min="1"
-                          className="form-input"
-                          placeholder="5"
-                        />
-                        {errors.read_time && <p className="text-red-500 text-sm mt-1">{errors.read_time.message}</p>}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <div className="form-group">
-                        <label className="form-label">🏷️ Tags (comma-separated)</label>
-                        <input
-                          {...register('tags')}
-                          type="text"
-                          placeholder="React, TypeScript, Tutorial, Web Development"
-                          className="form-input"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">📅 Publish Date</label>
-                        <input
-                          {...register('publish_date', { required: 'Publish date is required' })}
-                          type="date"
-                          className="form-input"
-                        />
-                        {errors.publish_date && <p className="text-red-500 text-sm mt-1">{errors.publish_date.message}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-8">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          {...register('featured')}
-                          type="checkbox"
-                          className="h-5 w-5 text-pink-600 focus:ring-pink-500 border-pink-300 rounded"
-                          id="featured"
-                        />
-                        <label htmlFor="featured" className="text-sm font-medium text-gray-700">⭐ Featured post (show on homepage)</label>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <input
-                          {...register('published')}
-                          type="checkbox"
-                          className="h-5 w-5 text-pink-600 focus:ring-pink-500 border-pink-300 rounded"
-                          id="published"
-                        />
-                        <label htmlFor="published" className="text-sm font-medium text-gray-700">🚀 Publish immediately</label>
-                      </div>
-                    </div>
+      <section className="card" aria-label="Posts">
+        <div className="lh" style={{ gridTemplateColumns: GRID }}>
+          <span>Post</span>
+          <span>Status</span>
+          <span>Home page</span>
+          <span className="right">Publish date</span>
+          <span className="sr">Actions</span>
+        </div>
+        {isLoading ? (
+          <SkeletonRows />
+        ) : (
+          <ul className="rows">
+            {shown.map((p) => (
+              <li key={p.id} className="row" style={{ gridTemplateColumns: GRID }}>
+                <div className="cell-id">
+                  <img className="thumb" src={p.cover_image || '/logo.svg'} alt="" width={1400} height={933} loading="lazy" style={p.cover_image ? undefined : { objectFit: 'contain' }} />
+                  <div>
+                    <p className="r1">{p.title}</p>
+                    <p className="r2">{[p.category || 'No category', `${p.read_time ?? 0} min read`, p.tags.length ? p.tags.join(', ') : 'no tags'].join(' · ')}</p>
                   </div>
                 </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    className="btn-success"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? (
-                      <div className="flex items-center">
-                        <div className="spinner w-4 h-4 mr-2"></div>
-                        Saving...
-                      </div>
-                    ) : (
-                      editingPost ? '✨ Update Post' : '📝 Create Post'
-                    )}
-                  </button>
-                </div>
-              </form>
+                <span className="hide-sm">
+                  <span className={'pill ' + (p.published ? 'p-live' : 'p-draft')}><span className="dot" />{p.published ? 'Published' : 'Draft'}</span>
+                </span>
+                <span className="hide-sm" style={{ fontSize: 13, color: p.featured ? '#4c1d95' : '#615a6c' }}>{p.featured ? 'Featured' : '—'}</span>
+                <span className="right num mute hide-sm" style={{ fontSize: 13 }}>{fmtDay(p.publish_date)}</span>
+                <button type="button" className="btn btn-text right" onClick={() => open(p)} aria-label={`Edit ${p.title}`}>Edit</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!isLoading && shown.length === 0 ? (
+          <div style={{ padding: '0 24px 20px' }}>
+            <div className="empty-slot">
+              <span>{needle ? `No posts match “${q.trim()}”.` : filter === 'draft' ? 'No drafts. Every post is live.' : 'No posts yet.'}</span>
+              <button type="button" className="btn btn-text" onClick={() => open(null)}>Start a draft</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        ) : null}
+      </section>
+
+      {editId !== null ? (
+        <Dialog
+          title={editId === 'new' ? 'New post' : 'Edit post'}
+          sub={d.published ? `Live at /blog/${d.slug}` : 'Draft. Only you can see it.'}
+          size="wide"
+          onClose={close}
+          saving={save.isPending}
+          onSubmit={submit}
+          footer={
+            <>
+              {editId !== 'new' ? <button type="button" className="btn btn-neg first" onClick={() => setConfirming(true)}>Delete post</button> : null}
+              <Switch checked={d.published} onChange={(v) => set('published', v)} style={{ width: 'auto', gap: 10, marginRight: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Published</span>
+              </Switch>
+              <button type="button" className="btn btn-line" onClick={close} disabled={save.isPending}>Cancel</button>
+              <SaveButton saving={save.isPending} label={saveLabel} />
+            </>
+          }
+        >
+          <div className="form">
+            <Field label="Title" span2 error={err('title')}>{(p) => <input {...p} value={d.title} onChange={(e) => set('title', e.target.value)} />}</Field>
+            <Field label="URL slug" span2 error={err('slug')} hint={`demitaylornimmo.com/blog/${d.slug}`}>{(p) => <input {...p} value={d.slug} onChange={(e) => set('slug', e.target.value)} />}</Field>
+            <Field label="Excerpt" span2 error={err('excerpt')} hint="On the blog card and in social previews.">{(p) => <textarea {...p} rows={2} value={d.excerpt} onChange={(e) => set('excerpt', e.target.value)} />}</Field>
+            <Field label="Cover image" span2 error={err('cover')}>
+              {(p) => (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <img className="thumb" src={d.cover || '/logo.svg'} alt="" width={1400} height={933} style={{ width: 88, height: 60, objectFit: d.cover ? 'cover' : 'contain' }} />
+                  <div className="joined" style={{ flex: 1, minWidth: 0 }}>
+                    <input {...p} placeholder="https://" value={d.cover} onChange={(e) => set('cover', e.target.value)} />
+                    <ImageUploadButton onUploaded={(url) => set('cover', url)} />
+                  </div>
+                </div>
+              )}
+            </Field>
+            <div className="field span2">
+              <div className="tabs" role="tablist" aria-label="Content">
+                <button type="button" role="tab" id="bl-tab-w" aria-selected={tab === 'write'} aria-controls="bl-panel" onClick={() => setTab('write')}>Write</button>
+                <button type="button" role="tab" id="bl-tab-p" aria-selected={tab === 'preview'} aria-controls="bl-panel" onClick={() => setTab('preview')}>Preview</button>
+                <span className="mute num" style={{ marginLeft: 'auto', alignSelf: 'center', fontSize: 12, fontWeight: 400 }}>{words} words · about {readMins(words)} min read</span>
+              </div>
+              <div id="bl-panel" role="tabpanel" aria-labelledby={tab === 'write' ? 'bl-tab-w' : 'bl-tab-p'}>
+                {tab === 'write' ? (
+                  <>
+                    <label className="sr" htmlFor="bl-body">Post content in Markdown</label>
+                    <textarea
+                      id="bl-body"
+                      className={'input code' + (err('content') ? ' err' : '')}
+                      style={{ minHeight: 240, width: '100%' }}
+                      value={d.content}
+                      onChange={(e) => set('content', e.target.value)}
+                      aria-invalid={!!err('content')}
+                      aria-describedby={err('content') ? 'bl-body-e' : undefined}
+                    />
+                    {err('content') ? <span id="bl-body-e" className="err-text">{err('content')}</span> : null}
+                  </>
+                ) : (
+                  <div className="panel md-preview" style={{ minHeight: 240, display: 'flex', flexDirection: 'column', gap: 12, fontWeight: 400, fontSize: 15, lineHeight: 1.7 }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{d.content || '_Nothing written yet._'}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Field label="Category" error={err('category')}>{(p) => <input {...p} value={d.category} onChange={(e) => set('category', e.target.value)} />}</Field>
+            <Field label="Read time" error={err('mins')}>
+              {(p) => (
+                <span className="joined">
+                  <input {...p} className={p.className + ' num'} type="number" min={1} value={d.mins} onChange={(e) => set('mins', e.target.value)} />
+                  <span className="btn" style={{ cursor: 'default' }} aria-hidden="true">min</span>
+                </span>
+              )}
+            </Field>
+            <Field label="Tags" error={err('tags')} hint="Separate with commas.">{(p) => <input {...p} value={d.tags} onChange={(e) => set('tags', e.target.value)} />}</Field>
+            <Field label="Author" error={err('author')}>{(p) => <input {...p} value={d.author} onChange={(e) => set('author', e.target.value)} />}</Field>
+            <Field label="Publish date" error={err('date')}>{(p) => <input {...p} type="date" value={d.date} onChange={(e) => set('date', e.target.value)} />}</Field>
+            <div className="field" style={{ justifyContent: 'flex-end', gap: 0 }}>
+              <Switch checked={d.featured} onChange={(v) => set('featured', v)}>
+                <span style={{ fontWeight: 500 }}>Feature on the blog</span>
+              </Switch>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {confirming && typeof editId === 'number' ? (
+        <ConfirmDialog
+          title="Delete this post?"
+          description={`“${d.title}” comes off the blog and its link stops working. This can't be undone. Unpublish it instead to keep it as a draft.`}
+          confirmLabel="Delete post"
+          busy={remove.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => remove.mutate(editId)}
+        />
+      ) : null}
+    </>
   )
 }
-
-export default Blog

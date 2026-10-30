@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import ProjectDetailsClient from '../project-details-client'
-import { fetchProjectById, fetchProjectBySlug } from '@/lib/api'
+import { fetchProjectById, fetchProjectBySlug, fetchProjects } from '@/lib/api'
+import type { Project } from '@/lib/api'
+import { nextProject } from '@/lib/selectors'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
 
 interface PageProps {
@@ -44,6 +46,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+/** "Next project" in `GET /api/projects` order; the band is simply left out if the list can't load. */
+async function loadNext(slug: string): Promise<Project | null> {
+  try {
+    return nextProject(await fetchProjects(), slug)
+  } catch (error) {
+    // Next control-flow errors carry a digest and must propagate.
+    if ((error as { digest?: unknown } | null)?.digest) throw error
+    console.error('Case study: project list unavailable for Next project', error)
+    return null
+  }
+}
+
 export default async function ProjectPage({ params }: PageProps) {
   const { slug } = await params
 
@@ -52,7 +66,7 @@ export default async function ProjectPage({ params }: PageProps) {
     const byId = await fetchProjectById(slug)
     if (!byId) notFound()
     if (byId.slug) redirect(`/projects/${byId.slug}`)
-    return <ProjectDetailsClient project={byId} />
+    return <ProjectDetailsClient project={byId} next={await loadNext(byId.slug)} />
   }
 
   const project = await fetchProjectBySlug(slug)
@@ -75,10 +89,9 @@ export default async function ProjectPage({ params }: PageProps) {
     <>
       <script
         type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <ProjectDetailsClient project={project} />
+      <ProjectDetailsClient project={project} next={await loadNext(project.slug || slug)} />
     </>
   )
 }

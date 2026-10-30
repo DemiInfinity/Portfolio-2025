@@ -1,222 +1,188 @@
+import { Fragment } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api'
-import { Users, FileText, Briefcase, BookOpen, GraduationCap, Award } from 'lucide-react'
+import { computeAttention, finding } from '@/lib/attention'
+import { isBuilding, rebuiltLabel, useCvStatus, useRegenerateCv } from '@/lib/cv'
+import { fmtDay, plural } from '@/lib/format'
+import { useFlags } from '@/lib/flags'
+import { SITE_URL } from '@/lib/config'
+import { PROJECTS_KEY, fetchProjects } from '@/lib/projects'
+import { BLOG_KEY, fetchPosts, publishedNewestFirst } from './Blog'
+import { WORK_KEY, fetchRoles } from './WorkHistory'
+import { EDUCATION_KEY, fetchEducation } from './Education'
+import { CERTS_KEY, fetchCerts } from './Certifications'
+import { LEARNING_KEY, SKILLS_KEY, fetchCourses, fetchSkills } from './Learning'
+import { useFlagToggle } from '@/components/useFlagToggle'
+import Switch from '@/components/ui/Switch'
+import Icon from '@/components/ui/Icon'
+import { useToast } from '@/components/ui/Toast'
 
-const Dashboard = () => {
-  const { data: stats } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: async () => {
-      const [projects, learning, blog, workHistory, education, certifications] = await Promise.all([
-        api.get('/projects'),
-        api.get('/learning'),
-        api.get('/blog/admin/all'),
-        api.get('/work-history'),
-        api.get('/education'),
-        api.get('/certifications')
-      ])
+const SWITCHES: [string, string, string][] = [
+  ['maintenance_mode', 'Maintenance mode', 'Shows every visitor the maintenance page.'],
+  ['open_to_work', 'Open to work badge', 'The badge beside your name on the home page.'],
+  ['show_marbl', 'List Marbl', 'Marbl on the Privacy and Terms pages.'],
+]
 
-      return {
-        projects: projects.data.data.length,
-        learning: learning.data.data.length,
-        blogPosts: blog.data.data.length,
-        workHistory: workHistory.data.data.length,
-        education: education.data.data.length,
-        certifications: certifications.data.data.length,
-        publishedPosts: blog.data.data.filter((post: any) => post.published).length
-      }
-    }
-  })
+export default function Dashboard() {
+  const { say } = useToast()
+  const projects = useQuery({ queryKey: PROJECTS_KEY, queryFn: fetchProjects })
+  const posts = useQuery({ queryKey: BLOG_KEY, queryFn: fetchPosts })
+  const roles = useQuery({ queryKey: WORK_KEY, queryFn: fetchRoles })
+  const education = useQuery({ queryKey: EDUCATION_KEY, queryFn: fetchEducation })
+  const certs = useQuery({ queryKey: CERTS_KEY, queryFn: fetchCerts })
+  const learning = useQuery({ queryKey: LEARNING_KEY, queryFn: fetchCourses })
+  const skills = useQuery({ queryKey: SKILLS_KEY, queryFn: fetchSkills })
+  const flags = useFlags()
+  const cv = useCvStatus()
+  const regen = useRegenerateCv(say)
+  const { toggle, confirm } = useFlagToggle()
 
-  const statCards = [
-    {
-      name: '💼 Total Projects',
-      value: stats?.projects || 0,
-      icon: Briefcase,
-      color: 'bg-gradient-to-r from-blue-400 to-blue-600',
-    },
-    {
-      name: '📚 Learning Items',
-      value: stats?.learning || 0,
-      icon: BookOpen,
-      color: 'bg-gradient-to-r from-green-400 to-emerald-600',
-    },
-    {
-      name: '📝 Blog Posts',
-      value: stats?.blogPosts || 0,
-      icon: FileText,
-      color: 'bg-gradient-to-r from-purple-400 to-purple-600',
-    },
-    {
-      name: '👥 Work Experience',
-      value: stats?.workHistory || 0,
-      icon: Users,
-      color: 'bg-gradient-to-r from-orange-400 to-orange-600',
-    },
-    {
-      name: '🎓 Education',
-      value: stats?.education || 0,
-      icon: GraduationCap,
-      color: 'bg-gradient-to-r from-pink-400 to-pink-600',
-    },
-    {
-      name: '🏆 Certifications',
-      value: stats?.certifications || 0,
-      icon: Award,
-      color: 'bg-gradient-to-r from-indigo-400 to-indigo-600',
-    },
+  const today = new Date()
+  const P = projects.data || []
+  const B = posts.data || []
+  const R = roles.data || []
+  const C = learning.data?.items || []
+  const certCount = certs.data?.length ?? 0
+  const published = publishedNewestFirst(B)
+  const latest = published[0]
+  const current = R.find((r) => !r.end_date)
+  const avg = C.length ? Math.round(C.reduce((a, c) => a + c.progress, 0) / C.length) : 0
+
+  const ready = !!(posts.data && learning.data && certs.data)
+  const input = { courses: C, cv: cv.data, certCount, latestPost: latest }
+  const todo = ready ? computeAttention(input, today) : []
+  const v = (loaded: unknown, value: string) => (loaded ? value : '–')
+
+  const kpis = [
+    { label: 'Projects', value: v(projects.data, String(P.length)), caption: `${P.filter((p) => p.featured).length} featured on the home page`, href: '/projects' },
+    { label: 'Blog posts', value: v(posts.data, String(B.length)), caption: `${published.length} published${latest ? ', latest ' + fmtDay(latest.publish_date) : ''}`, href: '/blog' },
+    { label: 'Roles', value: v(roles.data, String(R.length)), caption: current ? `Current: ${current.company}` : 'No current role', href: '/work-history' },
+    { label: 'Courses', value: v(learning.data, String(C.length)), caption: `${avg}% average progress`, href: '/learning' },
+    { label: 'Certifications', value: v(certs.data, String(certCount)), caption: certCount ? `${certCount} listed` : 'None listed yet', href: '/certifications' },
   ]
 
+  const s = cv.data
+  const building = regen.isPending || isBuilding(s)
+  const pdfRow = !s && !regen.isPending
+    ? { node: <span className="mute">Unknown</span> }
+    : building
+      ? { node: <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }} className="mute"><span className="spin" aria-hidden="true" style={{ borderColor: '#d9cfe6', borderTopColor: '#615a6c', width: 12, height: 12 }} />Rebuilding</span> }
+      : s?.state === 'failed'
+        ? { node: <span style={{ color: '#b4235a' }}>Build failed</span> }
+        : s?.generatedAt
+          ? { node: <span style={{ color: '#247b50' }}>Rebuilt {rebuiltLabel(s.generatedAt, today).replace(/^today, /, '')}</span> }
+          : { node: <span style={{ color: '#92400e' }}>Not built yet</span> }
+
+  const cvRows: [string, string, string][] = [
+    ['Experience', plural(R.length, 'role', 'roles'), '#241b33'],
+    ['Projects', plural(P.length, 'project', 'projects'), '#241b33'],
+    ['Skills', plural(skills.data?.length ?? 0, 'skill', 'skills'), '#241b33'],
+    ['Education', plural(education.data?.length ?? 0, 'entry', 'entries'), '#241b33'],
+    ['Learning', plural(C.length, 'course', 'courses'), '#241b33'],
+    ['Certifications', certCount ? String(certCount) : 'Left out', certCount ? '#241b33' : '#615a6c'],
+  ]
+
+  const flagRows = SWITCHES.map(([key, label, desc]) => ({ flag: flags.data?.find((f) => f.name === key), label, desc })).filter((r) => r.flag)
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>✨ Dashboard</h1>
-        <p className="mt-2 text-gray-600 font-medium">
-          Overview of your beautiful portfolio content and statistics 💖
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {statCards.map((item) => {
-          const Icon = item.icon
-          return (
-            <div key={item.name} className="card p-5 hover:scale-105 transition-all duration-300">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className={`w-12 h-12 ${item.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <div className="ml-4 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-600 truncate" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                      {item.name}
-                    </dt>
-                    <dd className="text-2xl font-bold text-gray-800" style={{ fontFamily: 'Playfair Display, serif' }}>
-                      {item.value}
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="card p-6">
-        <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          🚀 Quick Actions
-        </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <a
-              href="/projects"
-              className="relative group card p-6 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-pink-200"
-            >
-              <div>
-                <span className="rounded-xl inline-flex p-3 bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700">
-                  <Briefcase className="w-6 h-6" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  💼 Manage Projects
-                </h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  Add, edit, or remove projects from your portfolio ✨
-                </p>
-              </div>
-            </a>
-
-            <a
-              href="/blog"
-              className="relative group card p-6 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-pink-200"
-            >
-              <div>
-                <span className="rounded-xl inline-flex p-3 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-700">
-                  <FileText className="w-6 h-6" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  📝 Write Blog Post
-                </h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  Create and publish new blog articles 💖
-                </p>
-              </div>
-            </a>
-
-            <a
-              href="/learning"
-              className="relative group card p-6 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-pink-200"
-            >
-              <div>
-                <span className="rounded-xl inline-flex p-3 bg-gradient-to-r from-green-100 to-green-200 text-green-700">
-                  <BookOpen className="w-6 h-6" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  📚 Update Learning
-                </h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  Track your learning progress and add new skills 🌟
-                </p>
-              </div>
-            </a>
-
-            <a
-              href="/education"
-              className="relative group card p-6 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-pink-200"
-            >
-              <div>
-                <span className="rounded-xl inline-flex p-3 bg-gradient-to-r from-pink-100 to-pink-200 text-pink-700">
-                  <GraduationCap className="w-6 h-6" />
-                </span>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-lg font-bold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-                  <span className="absolute inset-0" aria-hidden="true" />
-                  🎓 Manage Education
-                </h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  Add and update your educational background 📖
-                </p>
-              </div>
-            </a>
-          </div>
-      </div>
-
-      {/* Portfolio Stats */}
-      <div className="card p-6">
-        <h3 className="text-xl font-bold gradient-text mb-6" style={{ fontFamily: 'Playfair Display, serif' }}>
-          📊 Portfolio Overview
-        </h3>
-        <div className="space-y-5">
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl">
-            <span className="text-sm font-medium text-gray-700" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              🚀 Published Blog Posts
-            </span>
-            <span className="text-lg font-bold text-pink-600" style={{ fontFamily: 'Playfair Display, serif' }}>
-              {stats?.publishedPosts || 0} / {stats?.blogPosts || 0}
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
-            <span className="text-sm font-medium text-gray-700" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              ✨ Total Content Items
-            </span>
-            <span className="text-lg font-bold text-blue-600" style={{ fontFamily: 'Playfair Display, serif' }}>
-              {(stats?.projects || 0) + (stats?.learning || 0) + (stats?.blogPosts || 0) + (stats?.workHistory || 0) + (stats?.education || 0) + (stats?.certifications || 0)}
-            </span>
-          </div>
+    <>
+      <div className="ad-head">
+        <div>
+          <h1 className="ad-title">Dashboard</h1>
+          <p className="ad-sub">{ready ? finding(input, today) : ' '}</p>
         </div>
+        <Link className="btn btn-primary" to="/blog?new=1">
+          <Icon name="plus" size={16} />
+          Write a post
+        </Link>
       </div>
-    </div>
+
+      <div className="card kpis" style={{ ['--n' as string]: 5 }}>
+        {kpis.map((k) => (
+          <Link key={k.label} className="kpi" to={k.href}>
+            <span className="kpi-l">{k.label}</span>
+            <span className="kpi-v">{k.value}</span>
+            <span className="kpi-c">{k.caption}</span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="rail">
+        <div className="stack">
+          <section className="card" aria-labelledby="todo-h">
+            <div className="card-head">
+              <h2 id="todo-h" className="card-title">Needs attention <span className="mute num" style={{ fontWeight: 400 }}>{ready ? todo.length : ''}</span></h2>
+            </div>
+            <ul className="rows">
+              {todo.map((t) => (
+                <li key={t.title} className="row" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto 140px' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p className="r1" style={{ whiteSpace: 'normal' }}>{t.title}</p>
+                    <p className="r2" style={{ whiteSpace: 'normal' }}>{t.detail}</p>
+                  </div>
+                  <span className={`pill p-${t.tone} hide-sm`}>{t.pill}</span>
+                  <Link className="btn btn-line right" to={t.href} style={{ minWidth: 140 }}>{t.action}</Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="card" aria-labelledby="posts-h">
+            <div className="card-head">
+              <h2 id="posts-h" className="card-title">Latest posts</h2>
+              <Link className="btn btn-text" to="/blog" style={{ minHeight: 36 }}>View all {B.length}</Link>
+            </div>
+            <div className="lh" style={{ gridTemplateColumns: 'minmax(0, 1fr) 110px 120px' }}><span>Post</span><span>Status</span><span className="right">Published</span></div>
+            <ul className="rows">
+              {published.slice(0, 4).map((p) => (
+                <li key={p.id} className="row" style={{ gridTemplateColumns: 'minmax(0, 1fr) 110px 120px' }}>
+                  <div className="cell-id">
+                    <img className="thumb" src={p.cover_image || '/logo.svg'} alt="" width={1400} height={933} loading="lazy" style={p.cover_image ? undefined : { objectFit: 'contain' }} />
+                    <div><p className="r1">{p.title}</p><p className="r2">{p.category} · {p.read_time ?? 0} min read</p></div>
+                  </div>
+                  <span className="hide-sm"><span className="pill p-live"><span className="dot" />Published</span></span>
+                  <span className="right num mute" style={{ fontSize: 13 }}>{fmtDay(p.publish_date)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <aside className="stack" style={{ gap: 16 }} aria-label="Site and CV">
+          <section>
+            <h2 className="rail-h">Site switches</h2>
+            <div className="card card-pad" style={{ paddingTop: 8, paddingBottom: 8 }}>
+              {flagRows.map((r, k) => (
+                <div key={r.label} style={{ padding: '10px 0', borderTop: k ? '1px solid #f0eaf7' : 0 }}>
+                  <Switch checked={!!r.flag!.enabled} onChange={() => toggle(r.flag!)}><span style={{ fontWeight: 500 }}>{r.label}</span></Switch>
+                  <p className="mute" style={{ fontSize: 13, marginTop: -4 }}>{r.desc}</p>
+                </div>
+              ))}
+              {flags.data && !flagRows.length ? <p className="mute" style={{ padding: '10px 0' }}>No site switches yet.</p> : null}
+            </div>
+          </section>
+          <section>
+            <h2 className="rail-h">Your CV</h2>
+            <div className="card card-pad">
+              <p className="mute" style={{ fontSize: 13 }}>Rebuilt from this content whenever it changes.</p>
+              <dl className="kv num" style={{ marginTop: 10 }}>
+                {cvRows.map(([label, value, ink]) => (
+                  <Fragment key={label}>
+                    <dt>{label}</dt>
+                    <dd className="right" style={{ color: ink }}>{value}</dd>
+                  </Fragment>
+                ))}
+                <dt>PDF for download</dt>
+                <dd className="right" data-testid="cv-pdf">{pdfRow.node}</dd>
+              </dl>
+              <a className="btn btn-line" href={`${SITE_URL}/cv`} target="_blank" rel="noopener noreferrer" style={{ width: '100%', marginTop: 14 }}>Preview the CV</a>
+              <button type="button" className="btn btn-text" onClick={() => regen.mutate()} disabled={building} style={{ width: '100%', marginTop: 4 }}>Regenerate CV</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      {confirm}
+    </>
   )
 }
-
-export default Dashboard

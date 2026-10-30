@@ -1,0 +1,756 @@
+{
+  "user": {
+    "id": "test-user-id-123",
+    "email": "test-admin@example.com",
+    "name": "Demi Taylor Nimmo",
+    "role": "admin"
+  },
+  "projects": [
+    {
+      "id": 1,
+      "title": "LunaLore",
+      "slug": "lunalore",
+      "description": "A platform for VTubers to craft their character’s lore and invite their community into the story, guided by a cybernetic anime wolf girl.",
+      "status": "in_development",
+      "featured": true,
+      "image": "/login-site.jpg",
+      "images": [],
+      "inspiration": "",
+      "technologies": [
+        "Electron",
+        "Next.js",
+        "Supabase",
+        "Vercel"
+      ],
+      "github_url": "",
+      "live_url": "",
+      "date": null,
+      "role": "Solo: design, frontend, backend",
+      "platform": "Desktop app and web",
+      "show_on_site": true,
+      "has_case_study": true,
+      "feature_titles": [
+        "Character profiles"
+      ],
+      "created_at": "2026-03-01T10:00:00Z",
+      "updated_at": "2026-10-01T10:00:00Z",
+      "content": "",
+      "case_study": {
+        "overview": "LunaLore helps VTubers write their character lore.",
+        "problem": "Lore lives in scattered docs.",
+        "how_might_we": "How might we keep lore in one place?",
+        "process": [
+          {
+            "label": "Discover",
+            "title": "Talking to creators",
+            "body": "Interviews.",
+            "image": null,
+            "image_alt": ""
+          },
+          {
+            "label": "Define",
+            "title": "Shaping the problem",
+            "body": "Synthesis.",
+            "image": null,
+            "image_alt": ""
+          },
+          {
+            "label": "Build",
+            "title": "Shipping the beta",
+            "body": "Electron and Next.js.",
+            "image": null,
+            "image_alt": ""
+          }
+        ],
+        "features": [
+          {
+            "title": "Character profiles",
+            "body": "Profiles.",
+            "image": null,
+            "image_alt": ""
+          }
+        ],
+        "challenges": [
+          {
+            "title": "One desktop and web codebase",
+            "solution": "Shared packages."
+          }
+        ],
+        "metrics": [
+          {
+            "value": "30%",
+            "label": "lower infrastructure costs"
+          }
+        ],
+        "learned": "Ship small."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Infinity Tracker",
+      "slug": "infinity-tracker",
+      "description": "Developer-first project management, local-first on the desktop with Electron and SQLite, and a Supabase API ready for cloud sync.",
+      "status": "in_development",
+      "featured": false,
+      "image": null,
+      "images": [],
+      "inspiration": "",
+      "technologies": [
+        "Electron",
+        "TypeScript",
+        "SQLite",
+        "React",
+        "Supabase"
+      ],
+      "github_url": "",
+      "live_url": "",
+      "date": null,
+      "role": null,
+      "platform": null,
+      "show_on_site": true,
+      "has_case_study": false,
+      "feature_titles": [],
+      "created_at": "2026-02-01T10:00:00Z",
+      "updated_at": "2026-09-01T10:00:00Z",
+      "content": "",
+      "case_study": null
+    },
+    {
+      "id": 3,
+      "title": "This portfolio",
+      "slug": "portfolio-website",
+      "description": "My home base: project deep-dives, writing and the details behind the work.",
+      "status": "completed",
+      "featured": false,
+      "image": "/login-site.jpg",
+      "images": [],
+      "inspiration": "",
+      "technologies": [
+        "Next.js",
+        "TypeScript"
+      ],
+      "github_url": "",
+      "live_url": "https://www.demitaylornimmo.com",
+      "date": null,
+      "role": null,
+      "platform": null,
+      "show_on_site": true,
+      "has_case_study": false,
+      "feature_titles": [],
+      "created_at": "2026-01-01T10:00:00Z",
+      "updated_at": "2026-08-01T10:00:00Z",
+      "content": "",
+      "case_study": null
+    }
+  ],
+  "blog": [
+    {
+      "id": 1,
+      "title": "How I Built Automatic Updates Into a Desktop App (Without the Headache)",
+      "slug": "automatic-updates-desktop-app",
+      "excerpt": "Excerpt for automatic-updates-desktop-app.",
+      "content": "# How I Built Automatic Updates Into a Desktop App (Without the Headache)\n\nBody text.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 3,
+      "created_at": "2026-04-01T09:00:00Z",
+      "publish_date": "2026-04-01T09:00:00Z",
+      "category": "Desktop",
+      "tags": [
+        "Velopack",
+        "C#",
+        "Avalonia"
+      ],
+      "featured": true,
+      "published": true,
+      "cover_image": "/login-site.jpg"
+    },
+    {
+      "id": 2,
+      "title": "Connecting Micro-Frontends to Serverless Backends: Patterns That Actually Work",
+      "slug": "micro-frontends-serverless-backends",
+      "excerpt": "Excerpt for micro-frontends-serverless-backends.",
+      "content": "# Connecting Micro-Frontends to Serverless Backends: Patterns That Actually Work\n\nBody text.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 12,
+      "created_at": "2026-01-23T09:00:00Z",
+      "publish_date": "2026-01-23T09:00:00Z",
+      "category": "Backend",
+      "tags": [
+        "Micro-frontends",
+        "AWS Lambda"
+      ],
+      "featured": false,
+      "published": true,
+      "cover_image": "/login-site.jpg"
+    },
+    {
+      "id": 3,
+      "title": "Stop Thinking in Pages. Start Thinking in Components.",
+      "slug": "think-in-components",
+      "excerpt": "Excerpt for think-in-components.",
+      "content": "# Stop Thinking in Pages. Start Thinking in Components.\n\nBody text.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 10,
+      "created_at": "2026-01-07T09:00:00Z",
+      "publish_date": "2026-01-07T09:00:00Z",
+      "category": "Frontend",
+      "tags": [
+        "Design systems",
+        "Storybook"
+      ],
+      "featured": false,
+      "published": true,
+      "cover_image": "/login-site.jpg"
+    },
+    {
+      "id": 4,
+      "title": "The Reality of Micro Frontend Adoption: Why MFEs Are Still Finding Their Footing",
+      "slug": "micro-frontend-adoption",
+      "excerpt": "Excerpt for micro-frontend-adoption.",
+      "content": "# The Reality of Micro Frontend Adoption: Why MFEs Are Still Finding Their Footing\n\nBody text.",
+      "author": "Demi Taylor Nimmo",
+      "read_time": 5,
+      "created_at": "2025-09-20T09:00:00Z",
+      "publish_date": "2025-09-20T09:00:00Z",
+      "category": "Frontend",
+      "tags": [
+        "Micro-frontends",
+        "Architecture"
+      ],
+      "featured": false,
+      "published": true,
+      "cover_image": "/login-site.jpg"
+    }
+  ],
+  "workHistory": [
+    {
+      "id": 1,
+      "position": "Software Developer",
+      "company": "Cintra HR & Payrolls",
+      "location": "Newcastle, remote",
+      "company_url": null,
+      "start_date": "2025-08-01",
+      "end_date": null,
+      "description": "Full-stack work on an enterprise payroll platform.",
+      "achievements": [
+        "Built the component library from scratch and founded its team",
+        "Introduced Storybook and design tokens",
+        "Learned and built an MCP server"
+      ],
+      "highlights": [],
+      "technologies": [
+        "Angular",
+        "C# / .NET Core",
+        "AWS",
+        "PostgreSQL",
+        "Storybook",
+        "Cypress",
+        "Docker"
+      ]
+    },
+    {
+      "id": 2,
+      "position": "Software Developer",
+      "company": "PASS Ltd",
+      "location": "Thornaby-on-Tees",
+      "company_url": null,
+      "start_date": "2024-06-01",
+      "end_date": "2024-08-01",
+      "description": "Focused improvements to a C# desktop suite.",
+      "achievements": [
+        "80% less manual update effort",
+        "60% less lookup time on calls"
+      ],
+      "highlights": [
+        "−80% manual update effort",
+        "−60% lookup time on calls"
+      ],
+      "technologies": [
+        "C# / .NET",
+        "Avalonia",
+        "MVVM",
+        "Velopack"
+      ]
+    },
+    {
+      "id": 3,
+      "position": "Mid Software Developer",
+      "company": "3T Global",
+      "location": "Newcastle, remote",
+      "company_url": null,
+      "start_date": "2022-07-01",
+      "end_date": "2024-06-01",
+      "description": "Full-stack engineer on 3TX.",
+      "achievements": [
+        "30% lower infrastructure costs",
+        "50% faster builds",
+        "40% less UI development time",
+        "60% faster data processing",
+        "25% higher team productivity"
+      ],
+      "highlights": [],
+      "technologies": [
+        "Angular",
+        "StencilJS",
+        "TypeScript",
+        "AWS Lambda",
+        ".NET Core",
+        "Storybook",
+        "Jest"
+      ]
+    },
+    {
+      "id": 4,
+      "position": "Junior Software Developer",
+      "company": "3T Global",
+      "location": "Newcastle, remote",
+      "company_url": null,
+      "start_date": "2021-02-01",
+      "end_date": "2022-07-01",
+      "description": "Kept legacy monolithic apps stable.",
+      "achievements": [
+        "35% less system downtime",
+        "20% faster bug resolution"
+      ],
+      "highlights": [],
+      "technologies": [
+        "C# / .NET",
+        "TypeScript",
+        "JavaScript"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "id": 1,
+      "institution": "Teesside University",
+      "degree": "BSc",
+      "field_of_study": "Computer Science",
+      "location": "Middlesbrough",
+      "start_date": "2016-09-01",
+      "end_date": "2020-06-01",
+      "grade": null,
+      "description": "Software engineering, AI, databases, data structures and algorithms, and web development.",
+      "achievements": []
+    }
+  ],
+  "certifications": [],
+  "learning": [
+    {
+      "id": 1,
+      "title": "The Complete Full-Stack Web Development Bootcamp",
+      "category": "Full stack",
+      "description": "Improve my ability to develop full applications.",
+      "progress": 19,
+      "status": "in_progress",
+      "start_date": "2025-04-01",
+      "estimated_completion": null,
+      "resources": []
+    },
+    {
+      "id": 2,
+      "title": "Complete Web & Mobile Designer: UI/UX, Figma and more",
+      "category": "Design",
+      "description": "Improve my ability to design frontends.",
+      "progress": 18,
+      "status": "in_progress",
+      "start_date": "2025-06-01",
+      "estimated_completion": null,
+      "resources": []
+    },
+    {
+      "id": 3,
+      "title": "The Complete Cypress v13 Course: Automation Testing Bootcamp",
+      "category": "Testing",
+      "description": "Level up my testing skills.",
+      "progress": 15,
+      "status": "in_progress",
+      "start_date": "2025-09-01",
+      "estimated_completion": "2025-12-01",
+      "resources": []
+    },
+    {
+      "id": 4,
+      "title": "The AI Engineer Course 2025: Complete AI Engineer Bootcamp",
+      "category": "AI",
+      "description": "Learn AI engineering from the ground up.",
+      "progress": 1,
+      "status": "in_progress",
+      "start_date": "2025-06-01",
+      "estimated_completion": null,
+      "resources": []
+    }
+  ],
+  "skills": [
+    {
+      "id": 1,
+      "name": "TypeScript",
+      "category": "Language",
+      "level": "advanced",
+      "description": "4 years professionally"
+    },
+    {
+      "id": 2,
+      "name": "C#",
+      "category": "Language",
+      "level": "advanced",
+      "description": "4 years professionally"
+    }
+  ],
+  "flags": [
+    {
+      "id": 1,
+      "name": "maintenance_mode",
+      "description": "Shows every visitor the maintenance page instead of the site.",
+      "enabled": false,
+      "created_at": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "name": "open_to_work",
+      "description": "The Open to work badge beside your name on the home page.",
+      "enabled": true,
+      "created_at": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": 3,
+      "name": "show_marbl",
+      "description": "Includes Marbl in the apps the Privacy and Terms pages cover.",
+      "enabled": false,
+      "created_at": "2026-01-01T00:00:00Z"
+    }
+  ],
+  "cvStatus": {
+    "state": "idle",
+    "generatedAt": null,
+    "requestedAt": null,
+    "startedAt": null,
+    "error": null,
+    "pdfUrl": null,
+    "size": null
+  },
+  "resume": {
+    "success": true,
+    "available": false,
+    "url": null
+  },
+  "about": {
+    "intro": [
+      "I build software people enjoy using. Frontend first, full stack when the job needs it.",
+      "For the last five years I have worked on payroll, learning and desktop platforms.",
+      "Away from work I cheer, read and tinker with side projects."
+    ],
+    "looking_for": {
+      "summary": "A full-stack or frontend role on a kind, product-minded team.",
+      "items": [
+        {
+          "label": "Role",
+          "value": "Full-stack or frontend"
+        },
+        {
+          "label": "Where",
+          "value": "Remote or Newcastle"
+        },
+        {
+          "label": "When",
+          "value": "From January 2027"
+        }
+      ]
+    },
+    "open_to_work_off_line": "Happily at Cintra, always up for a chat",
+    "cv_headline": "Software Developer",
+    "cv_profile": "Full-stack developer with five years of experience.",
+    "cv_ai_workflow": "",
+    "contact": {
+      "email": "hello@demitaylornimmo.com",
+      "linkedin_url": "https://www.linkedin.com/in/demi",
+      "github_url": "https://github.com/DemiInfinity",
+      "portfolio_url": "https://www.demitaylornimmo.com",
+      "location": "Newcastle upon Tyne"
+    },
+    "updated_at": null
+  },
+  "recommendations": [
+    {
+      "id": 1,
+      "quote": "Demi is one of the most thoughtful developers I have worked with.",
+      "full_text": null,
+      "name": "Adam Mellor",
+      "role": "Engineering Manager",
+      "company": "3T Global",
+      "relationship": "managed Demi directly",
+      "source": "LinkedIn",
+      "source_url": null,
+      "date": "2024-06-01",
+      "show_on_cv": true,
+      "sort_order": 0,
+      "created_at": "2026-10-28T00:00:00Z",
+      "updated_at": "2026-10-28T00:00:00Z"
+    }
+  ],
+  "analytics": {
+    "range": {
+      "from": "2026-09-28",
+      "to": "2026-10-27",
+      "days": 30
+    },
+    "generatedAt": "2026-10-27T09:41:00Z",
+    "visits": 688,
+    "pageViews": 1162,
+    "avgSecondsPerView": 93,
+    "daily": [
+      {
+        "date": "2026-09-28",
+        "visits": 18
+      },
+      {
+        "date": "2026-09-29",
+        "visits": 22
+      },
+      {
+        "date": "2026-09-30",
+        "visits": 15
+      },
+      {
+        "date": "2026-10-01",
+        "visits": 12
+      },
+      {
+        "date": "2026-10-02",
+        "visits": 24
+      },
+      {
+        "date": "2026-10-03",
+        "visits": 27
+      },
+      {
+        "date": "2026-10-04",
+        "visits": 21
+      },
+      {
+        "date": "2026-10-05",
+        "visits": 19
+      },
+      {
+        "date": "2026-10-06",
+        "visits": 16
+      },
+      {
+        "date": "2026-10-07",
+        "visits": 14
+      },
+      {
+        "date": "2026-10-08",
+        "visits": 26
+      },
+      {
+        "date": "2026-10-09",
+        "visits": 29
+      },
+      {
+        "date": "2026-10-10",
+        "visits": 23
+      },
+      {
+        "date": "2026-10-11",
+        "visits": 20
+      },
+      {
+        "date": "2026-10-12",
+        "visits": 17
+      },
+      {
+        "date": "2026-10-13",
+        "visits": 61
+      },
+      {
+        "date": "2026-10-14",
+        "visits": 38
+      },
+      {
+        "date": "2026-10-15",
+        "visits": 25
+      },
+      {
+        "date": "2026-10-16",
+        "visits": 22
+      },
+      {
+        "date": "2026-10-17",
+        "visits": 19
+      },
+      {
+        "date": "2026-10-18",
+        "visits": 16
+      },
+      {
+        "date": "2026-10-19",
+        "visits": 21
+      },
+      {
+        "date": "2026-10-20",
+        "visits": 24
+      },
+      {
+        "date": "2026-10-21",
+        "visits": 18
+      },
+      {
+        "date": "2026-10-22",
+        "visits": 15
+      },
+      {
+        "date": "2026-10-23",
+        "visits": 27
+      },
+      {
+        "date": "2026-10-24",
+        "visits": 30
+      },
+      {
+        "date": "2026-10-25",
+        "visits": 26
+      },
+      {
+        "date": "2026-10-26",
+        "visits": 23
+      },
+      {
+        "date": "2026-10-27",
+        "visits": 20
+      }
+    ],
+    "pages": [
+      {
+        "path": "/",
+        "title": "Home",
+        "views": 512,
+        "avgSeconds": 48
+      },
+      {
+        "path": "/blog/automatic-updates-desktop-app",
+        "title": "Automatic updates",
+        "views": 186,
+        "avgSeconds": 214
+      },
+      {
+        "path": "/projects",
+        "title": null,
+        "views": 141,
+        "avgSeconds": 71
+      },
+      {
+        "path": "/experience",
+        "title": null,
+        "views": 97,
+        "avgSeconds": 63
+      },
+      {
+        "path": "/about",
+        "title": null,
+        "views": 88,
+        "avgSeconds": 55
+      },
+      {
+        "path": "/blog/micro-frontends-serverless-backends",
+        "title": "Micro-frontends and serverless post",
+        "views": 64,
+        "avgSeconds": 302
+      },
+      {
+        "path": "/blog/old-post-1",
+        "title": "Old post 1",
+        "views": 8,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-2",
+        "title": "Old post 2",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-3",
+        "title": "Old post 3",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-4",
+        "title": "Old post 4",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-5",
+        "title": "Old post 5",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-6",
+        "title": "Old post 6",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-7",
+        "title": "Old post 7",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-8",
+        "title": "Old post 8",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-9",
+        "title": "Old post 9",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-10",
+        "title": "Old post 10",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-11",
+        "title": "Old post 11",
+        "views": 6,
+        "avgSeconds": 40
+      },
+      {
+        "path": "/blog/old-post-12",
+        "title": "Old post 12",
+        "views": 6,
+        "avgSeconds": 40
+      }
+    ],
+    "referrers": [
+      {
+        "source": "Direct",
+        "visits": 301
+      },
+      {
+        "source": "linkedin.com",
+        "visits": 214
+      },
+      {
+        "source": "google.com",
+        "visits": 118
+      },
+      {
+        "source": "github.com",
+        "visits": 33
+      },
+      {
+        "source": "duckduckgo.com",
+        "visits": 22
+      }
+    ]
+  }
+}

@@ -2,7 +2,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import BlogPostClient from './BlogPostClient'
 import { resolveMediaUrl } from '@/lib/mediaUrl'
-import { fetchBlogPostBySlug } from '@/lib/api'
+import { fetchBlogPostBySlug, fetchBlogPosts } from '@/lib/api'
+import type { BlogPost } from '@/lib/api'
+import { keepReading } from '@/lib/selectors'
 
 interface PageProps {
   params: Promise<{
@@ -54,7 +56,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       url,
       siteName: 'Demi Taylor Nimmo',
       type: 'article',
-      publishedTime: post.publish_date || post.created_at,
+      publishedTime: post.publish_date || post.created_at || undefined,
       authors: [author],
       tags: post.tags ? (Array.isArray(post.tags) ? post.tags : JSON.parse(post.tags || '[]')) : [],
       ...(ogImage ? { images: [{ url: ogImage, alt: post.title }] } : {}),
@@ -80,5 +82,18 @@ export default async function BlogPostPage({ params }: PageProps) {
     notFound()
   }
 
-  return <BlogPostClient slug={slug} />
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com').replace(/\/$/, '')
+  const others = await loadOthers()
+  return <BlogPostClient post={post} url={`${siteUrl}/blog/${post.slug || slug}`} keepReading={keepReading(others, post)} />
+}
+
+/** "Keep reading" is optional: a failed list just hides it. */
+async function loadOthers(): Promise<BlogPost[]> {
+  try {
+    return await fetchBlogPosts({ limit: 100 })
+  } catch (error) {
+    if ((error as { digest?: unknown } | null)?.digest) throw error
+    console.error('Post: list unavailable for Keep reading', error)
+    return []
+  }
 }

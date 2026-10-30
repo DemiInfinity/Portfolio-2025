@@ -2,8 +2,11 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import Layout from '@/components/Layout'
+import LoadingSpinner from '@/components/LoadingSpinner'
+import { navFor, NAV } from '@/lib/nav'
 import Login from '@/pages/Login'
 import Dashboard from './pages/Dashboard'
+import About from './pages/About'
 import Projects from './pages/Projects'
 import Learning from './pages/Learning'
 import WorkHistory from './pages/WorkHistory'
@@ -13,43 +16,27 @@ import Blog from './pages/Blog'
 import Analytics from './pages/Analytics'
 import FeatureFlags from './pages/FeatureFlags'
 import Settings from './pages/Settings'
-import LoadingSpinner from '@/components/LoadingSpinner'
+
+/** "{Page} | Admin | Demi Taylor Nimmo", with the nav's sentence-case labels. */
+export const documentTitle = (pathname: string, signedIn: boolean) =>
+  `${signedIn ? (NAV.some((n) => n.path === pathname) ? navFor(pathname).label : 'Dashboard') : 'Sign in'} | Admin | Demi Taylor Nimmo`
 
 function App() {
   const { user, loading } = useAuth()
   const location = useLocation()
 
   useEffect(() => {
-    const path = location.pathname
-    const pageTitleMap: Record<string, string> = {
-      '/': 'Dashboard',
-      '/projects': 'Projects',
-      '/learning': 'Learning',
-      '/work-history': 'Work History',
-      '/education': 'Education',
-      '/certifications': 'Certifications',
-      '/blog': 'Blog',
-      '/analytics': 'Analytics',
-      '/feature-flags': 'Feature Flags',
-      '/settings': 'Settings',
-    }
-
-    const page = !user ? 'Login' : (pageTitleMap[path] || 'Dashboard')
-    document.title = `${page} | Admin | Demi Taylor Nimmo`
+    document.title = documentTitle(location.pathname, !!user)
   }, [location.pathname, user])
 
-  if (loading) {
-    return <LoadingSpinner />
-  }
-
-  if (!user) {
-    return <Login />
-  }
+  if (loading) return <LoadingSpinner />
+  if (!user) return <Login />
 
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/about" element={<About />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/learning" element={<Learning />} />
         <Route path="/work-history" element={<WorkHistory />} />

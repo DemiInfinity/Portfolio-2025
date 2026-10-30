@@ -27,13 +27,8 @@ export const useMaintenanceMode = () => {
   const [error, setError] = useState<string | null>(maintenanceState.error)
 
   useEffect(() => {
-    // If we've already checked maintenance mode in this browser session, use cached result
-    if (hasCheckedMaintenance) {
-      setIsMaintenanceMode(maintenanceState.isMaintenanceMode)
-      setIsLoading(maintenanceState.isLoading)
-      setError(maintenanceState.error)
-      return
-    }
+    // Already checked in this browser session: the state was initialised from the cache.
+    if (hasCheckedMaintenance) return
 
     const checkMaintenanceMode = async () => {
       try {

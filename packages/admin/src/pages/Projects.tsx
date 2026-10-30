@@ -1,576 +1,375 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { Plus, Edit, Trash2, ExternalLink } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { apiError, fieldErrors } from '@/lib/errors'
+import { commas, dayOf, lines, plural, slugify } from '@/lib/format'
+import { PROJECTS_KEY, fetchProject, fetchProjects, isPublic, type Project, type ProjectStatus } from '@/lib/projects'
+import { CV_STATUS_KEY } from '@/lib/cv'
+import { emptyCase, fromCaseForm, serverPathToForm, toCaseForm, validateCase, type CaseForm, type IndexMap } from '@/lib/caseStudy'
+import { useQ } from '@/hooks/useQ'
+import { useEditParam } from '@/hooks/useEditParam'
+import Dialog, { SaveButton } from '@/components/ui/Dialog'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Field from '@/components/ui/Field'
+import Switch from '@/components/ui/Switch'
+import Segmented from '@/components/ui/Segmented'
+import Icon from '@/components/ui/Icon'
+import { SkeletonRows } from '@/components/ui/Skeleton'
+import { useToast } from '@/components/ui/Toast'
 import { ImageUploadButton } from '@/components/ImageUploadButton'
-import { GithubIcon } from '@/components/BrandIcons'
+import CaseStudyEditor from '@/components/project/CaseStudyEditor'
 
-interface Project {
-  id: number
-  title: string
-  slug?: string
-  description: string
-  image?: string
-  content?: string
-  inspiration?: string
-  images?: string[]
-  status?: 'in_development' | 'ideas' | 'completed'
-  technologies: string[] | string
-  github_url?: string
-  live_url?: string
-  date: string
-  featured: boolean
+const STATUS: Record<ProjectStatus, [string, string]> = {
+  in_development: ['In development', 'p-hue'],
+  ideas: ['Idea', 'p-off'],
+  completed: ['Completed', 'p-live'],
 }
 
-interface ProjectForm {
-  title: string
-  slug: string
-  description: string
-  image?: string
-  content: string
-  inspiration: string
-  images: string
-  status: 'in_development' | 'ideas' | 'completed'
-  technologies: string
-  github_url?: string
-  live_url?: string
-  date: string
-  featured: boolean
+type Draft = {
+  title: string; slug: string; description: string; status: ProjectStatus; image: string; gallery: string; inspiration: string
+  techText: string; github: string; live: string; date: string; role: string; platform: string; featured: boolean; showOnSite: boolean; content: string
 }
 
-const Projects = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingProject, setEditingProject] = useState<Project | null>(null)
-  const queryClient = useQueryClient()
+const newDraft = (): Draft => ({ title: '', slug: '', description: '', status: 'ideas', image: '', gallery: '', inspiration: '', techText: '', github: '', live: '', date: '', role: '', platform: '', featured: false, showOnSite: true, content: '' })
 
-  const { data: projects, isLoading } = useQuery({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const response = await api.get('/projects')
-      const projectsData = response.data.data as any[]
-      // Ensure technologies is always an array
-      return projectsData.map((project: any) => {
-        let technologies: string[] = []
-        const techValue = project.technologies
+const toDraft = (p: Project): Draft => ({
+  title: p.title || '', slug: p.slug || '', description: p.description || '', status: p.status || 'ideas', image: p.image || '', gallery: p.images.join('\n'),
+  inspiration: p.inspiration || '', techText: p.technologies.join(', '), github: p.github_url || '', live: p.live_url || '', date: dayOf(p.date),
+  role: p.role || '', platform: p.platform || '', featured: p.featured, showOnSite: p.show_on_site !== false, content: p.content || '',
+})
 
-        if (Array.isArray(techValue)) {
-          technologies = techValue
-        } else if (typeof techValue === 'string') {
-          try {
-            if (techValue.startsWith('[')) {
-              technologies = JSON.parse(techValue)
-            } else {
-              technologies = techValue.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
-            }
-          } catch {
-            technologies = []
-          }
-        }
+export const toProjectBody = (d: Draft, caseStudy: object | null) => ({
+  title: d.title.trim(),
+  slug: d.slug.trim() || slugify(d.title),
+  description: d.description.trim(),
+  status: d.status,
+  image: d.image.trim(),
+  images: lines(d.gallery),
+  inspiration: d.inspiration.trim(),
+  technologies: commas(d.techText),
+  github_url: d.github.trim(),
+  live_url: d.live.trim(),
+  date: d.date || null,
+  role: d.role.trim() || null,
+  platform: d.platform.trim() || null,
+  featured: d.featured,
+  show_on_site: d.showOnSite,
+  content: d.content,
+  case_study: caseStudy,
+})
 
-        return {
-          ...project,
-          technologies
-        } as Project
-      })
-    }
-  })
+const PATH: Record<string, keyof Draft> = { title: 'title', slug: 'slug', description: 'description', status: 'status', image: 'image', images: 'gallery', inspiration: 'inspiration', technologies: 'techText', github_url: 'github', live_url: 'live', date: 'date', role: 'role', platform: 'platform' }
 
-  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<ProjectForm>()
+type Filter = 'all' | ProjectStatus
+const GRID = 'minmax(0, 1fr) 140px minmax(0, 300px) 100px 80px'
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9 -]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-+|-+$/g, '')
+export default function Projects() {
+  const qc = useQueryClient()
+  const { say } = useToast()
+  const [q, setQ] = useQ()
+  const [filter, setFilter] = useState<Filter>('all')
+  const { data: projects, isLoading } = useQuery({ queryKey: PROJECTS_KEY, queryFn: fetchProjects })
+
+  const [editId, setEditId] = useState<number | 'new' | null>(null)
+  const [d, setD] = useState<Draft>(newDraft)
+  const [cs, setCs] = useState<CaseForm>(emptyCase)
+  const [hadCase, setHadCase] = useState(false)
+  const [legacy, setLegacy] = useState(false)
+  const [tab, setTab] = useState<'details' | 'case'>('details')
+  const [tried, setTried] = useState(false)
+  const [serverErr, setServerErr] = useState<Record<string, string>>({})
+  const [caseServerErr, setCaseServerErr] = useState<Record<string, string>>({})
+  const [confirming, setConfirming] = useState(false)
+  const [opening, setOpening] = useState<number | null>(null)
+
+  const reset = () => {
+    setTab('details')
+    setTried(false)
+    setServerErr({})
+    setCaseServerErr({})
+    setConfirming(false)
   }
 
-  const handleTitleChange = (title: string) => {
-    if (!editingProject) {
-      setValue('slug', generateSlug(title))
+  const open = async (p: Project | null) => {
+    if (!p) {
+      setEditId('new')
+      setD(newDraft())
+      setCs(emptyCase())
+      setHadCase(false)
+      setLegacy(false)
+      reset()
+      return
+    }
+    setOpening(p.id)
+    try {
+      // H-19: the editor reads the full record (case_study, content) from the admin endpoint.
+      const full = await qc.fetchQuery({ queryKey: ['project', p.id], queryFn: () => fetchProject(p.id), staleTime: 0 })
+      setEditId(p.id)
+      setD(toDraft(full))
+      setCs(toCaseForm(full.case_study))
+      setHadCase(!!full.case_study || !!p.has_case_study)
+      setLegacy(!!(full.content || '').trim())
+      reset()
+    } catch (e) {
+      say(apiError(e, "Couldn't open the project. Try again."))
+    } finally {
+      setOpening(null)
     }
   }
+  const close = () => setEditId(null)
+  useEditParam(projects, open)
 
-  const createMutation = useMutation({
-    mutationFn: (data: ProjectForm) => api.post('/projects', {
-      ...data,
-      technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
-      images: data.images
-        ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
-        : []
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project created successfully')
-      setIsModalOpen(false)
-      reset()
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setD((p) => {
+      const next = { ...p, [k]: v }
+      if (k === 'title' && editId === 'new') next.slug = slugify(String(v))
+      return next
+    })
+    setServerErr((e) => ({ ...e, [k]: '' }))
+  }
+  const setCase = (v: CaseForm) => {
+    setCs(v)
+    setCaseServerErr({})
+  }
+
+  const detailErr = (k: keyof Draft) => (tried && k === 'title' && !d.title.trim() ? 'Give the project a title.' : serverErr[k] || null)
+  const caseClientErr = validateCase(cs)
+  const caseErrors = { ...(tried ? caseClientErr : {}), ...caseServerErr }
+  const detailErrCount = (tried && !d.title.trim() ? 1 : 0) + Object.values(serverErr).filter(Boolean).length
+  const caseErrCount = Object.keys(caseErrors).length
+
+  const indexMap = useRef<IndexMap | null>(null)
+  const save = useMutation({
+    mutationFn: async () => {
+      const { value, index } = fromCaseForm(cs)
+      indexMap.current = index
+      const body = toProjectBody(d, value)
+      return editId === 'new' ? api.post('/projects', body) : api.put(`/projects/${editId}`, body)
     },
-    onError: (error: any) => {
-      console.error('Create error:', error)
-      toast.error(error.response?.data?.error || 'Failed to create project')
-    }
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PROJECTS_KEY })
+      qc.invalidateQueries({ queryKey: CV_STATUS_KEY })
+      if (typeof editId === 'number') qc.removeQueries({ queryKey: ['project', editId] })
+      close()
+      say(`Saved ${d.title.trim()}`)
+    },
+    onError: (e) => {
+      const fe = fieldErrors(e)
+      const det: Record<string, string> = {}
+      const cse: Record<string, string> = {}
+      for (const [p, m] of Object.entries(fe)) {
+        if (p.startsWith('case_study')) {
+          const fp = indexMap.current ? serverPathToForm(p, indexMap.current) : null
+          if (fp) cse[fp] = m
+        } else if (PATH[p]) det[PATH[p]] = m
+      }
+      if (Object.keys(det).length || Object.keys(cse).length) {
+        setServerErr(det)
+        setCaseServerErr(cse)
+        setTab(Object.keys(det).length ? 'details' : 'case')
+      } else say(apiError(e))
+    },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: ProjectForm }) => api.put(`/projects/${id}`, {
-      ...data,
-      technologies: data.technologies.split(',').map(t => t.trim()).filter(Boolean),
-      images: data.images
-        ? data.images.split('\n').map(s => s.trim()).filter(Boolean)
-        : []
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project updated successfully')
-      setIsModalOpen(false)
-      setEditingProject(null)
-      reset()
-    },
-    onError: (error: any) => {
-      console.error('Update error:', error)
-      toast.error(error.response?.data?.error || 'Failed to update project')
-    }
-  })
-
-  const deleteMutation = useMutation({
+  const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/projects/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Project deleted successfully')
-    }
+      qc.invalidateQueries({ queryKey: PROJECTS_KEY })
+      qc.invalidateQueries({ queryKey: CV_STATUS_KEY })
+      setConfirming(false)
+      close()
+      say(`Deleted ${d.title}`)
+    },
+    onError: (e) => {
+      setConfirming(false)
+      say(apiError(e, "Couldn't delete. Try again."))
+    },
   })
 
-  const onSubmit = (data: ProjectForm) => {
-    if (editingProject) {
-      updateMutation.mutate({ id: editingProject.id, data })
-    } else {
-      createMutation.mutate(data)
+  const submit = () => {
+    setTried(true)
+    const detailsBad = !d.title.trim()
+    const caseBad = Object.keys(validateCase(cs)).length > 0
+    if (detailsBad || caseBad) {
+      setTab(detailsBad ? 'details' : 'case')
+      return
     }
+    save.mutate()
   }
 
-  const openModal = (project?: Project) => {
-    if (project) {
-      setEditingProject(project)
-      // Open modal immediately with list data, then hydrate with full record
-      const formattedDate = project.date
-        ? new Date(project.date).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0]
-
-      const technologiesString = Array.isArray(project.technologies)
-        ? project.technologies.join(', ')
-        : (typeof project.technologies === 'string' ? project.technologies : '')
-
-      reset({
-        title: project.title,
-        slug: project.slug || '',
-        description: project.description,
-        image: project.image,
-        content: project.content || '',
-        inspiration: project.inspiration || '',
-        images: Array.isArray(project.images) ? project.images.join('\n') : '',
-        status: project.status || 'in_development',
-        technologies: technologiesString,
-        github_url: project.github_url,
-        live_url: project.live_url,
-        date: formattedDate,
-        featured: project.featured
-      })
-
-      api.get(`/projects/${project.id}`).then((res) => {
-        const full = res.data?.data as Project | undefined
-        if (!full) return
-
-        const fullDate = full.date
-          ? new Date(full.date).toISOString().split('T')[0]
-          : formattedDate
-
-        const fullTech = Array.isArray(full.technologies)
-          ? full.technologies.join(', ')
-          : (typeof full.technologies === 'string' ? full.technologies : technologiesString)
-
-        reset({
-          title: full.title || project.title,
-          slug: full.slug || project.slug || '',
-          description: full.description || project.description,
-          image: full.image || project.image,
-          content: full.content || '',
-          inspiration: full.inspiration || '',
-          images: Array.isArray(full.images) ? full.images.join('\n') : '',
-          status: full.status || project.status || 'in_development',
-          technologies: fullTech,
-          github_url: full.github_url || project.github_url,
-          live_url: full.live_url || project.live_url,
-          date: fullDate,
-          featured: Boolean(full.featured)
-        })
-      }).catch(() => {
-        // If hydration fails, keep the list data; don't block editing
-      })
-    } else {
-      setEditingProject(null)
-      reset({
-        title: '',
-        slug: '',
-        description: '',
-        image: '',
-        content: '',
-        inspiration: '',
-        images: '',
-        status: 'in_development',
-        technologies: '',
-        github_url: '',
-        live_url: '',
-        date: new Date().toISOString().split('T')[0],
-        featured: false
-      })
-    }
-    setIsModalOpen(true)
-  }
-
-  const getStatusLabel = (status?: string) => {
-    switch (status) {
-      case 'in_development':
-        return '🚧 In Development'
-      case 'ideas':
-        return '💡 Ideas'
-      case 'completed':
-        return '✅ Completed'
-      default:
-        return '🚧 In Development'
-    }
-  }
-
-  const closeModal = () => {
-    setIsModalOpen(false)
-    setEditingProject(null)
-    reset()
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="spinner mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading your beautiful projects... ✨</p>
-        </div>
-      </div>
-    )
-  }
+  const all = projects || []
+  const needle = q.trim().toLowerCase()
+  const inQ = all.filter((p) => !needle || p.title.toLowerCase().includes(needle) || p.technologies.some((t) => t.toLowerCase().includes(needle)))
+  const shown = inQ.filter((p) => filter === 'all' || p.status === filter)
+  const featuredCount = all.filter((p) => p.featured).length
+  const otherFeatured = all.find((p) => p.featured && p.id !== editId)
+  const techList = commas(d.techText)
+  const caseEmpty = editId === 'new' ? !fromCaseForm(cs).value : !hadCase && !fromCaseForm(cs).value
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <>
+      <div className="ad-head">
         <div>
-          <h1 className="text-3xl font-bold gradient-text" style={{ fontFamily: 'Playfair Display, serif' }}>✨ Projects</h1>
-          <p className="mt-2 text-gray-600 font-medium">
-            Manage your beautiful portfolio projects 💖
-          </p>
+          <h1 className="ad-title">Projects</h1>
+          <p className="ad-sub">{projects ? `${plural(all.length, 'project', 'projects')}, ${featuredCount} featured on the home page.` : ' '}</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="btn-primary floating-hearts"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Project
+        <button type="button" className="btn btn-primary" onClick={() => open(null)}>
+          <Icon name="plus" size={16} />
+          New project
         </button>
       </div>
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {projects?.map((project) => (
-          <div key={project.id} className="card p-6 hover:scale-105 transition-all duration-300">
-            <div className="h-48 bg-gradient-to-br from-pink-100 to-purple-100 rounded-xl mb-4 overflow-hidden flex items-center justify-center">
-              {project.image ? (
-                <img src={project.image} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-4xl opacity-50">🎨</span>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>{project.title}</h3>
-                {project.featured && (
-                  <span className="px-3 py-1 text-xs font-medium bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-full">
-                    ⭐ Featured
-                  </span>
-                )}
-              </div>
-              <div>
-                <span className="px-3 py-1 text-xs font-semibold bg-white/70 border border-pink-200 text-pink-700 rounded-full">
-                  {getStatusLabel(project.status)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 line-clamp-3 font-medium">{project.description}</p>
-              <div className="flex flex-wrap gap-2">
-                {Array.isArray(project.technologies) && project.technologies.length > 0 ? (
-                  <>
-                    {project.technologies.slice(0, 3).map((tech) => (
-                      <span key={tech} className="px-3 py-1 text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-pink-700 rounded-full font-medium">
-                        {tech}
-                      </span>
-                    ))}
-                    {project.technologies.length > 3 && (
-                      <span className="px-3 py-1 text-xs bg-gray-100 text-gray-500 rounded-full font-medium">
-                        +{project.technologies.length - 3} more
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-gray-400 text-xs">No technologies listed</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex space-x-3">
-                  {project.github_url && (
-                    <a
-                      href={project.github_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-pink-100 hover:text-pink-600 transition-colors"
-                    >
-                      <GithubIcon className="w-4 h-4" />
-                    </a>
-                  )}
-                  {project.live_url && (
-                    <a
-                      href={project.live_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-pink-100 hover:text-pink-600 transition-colors"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => openModal(project)}
-                    className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('Are you sure you want to delete this project? 💔')) {
-                        deleteMutation.mutate(project.id)
-                      }
-                    }}
-                    className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="toolbar">
+        <div className="search">
+          <label className="sr" htmlFor="pj-q">Search projects</label>
+          <Icon name="search" size={16} />
+          <input id="pj-q" className="input" type="search" placeholder="Title or technology" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Segmented
+          aria-label="Filter by status"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'All', count: inQ.length },
+            { value: 'in_development', label: 'In development', count: inQ.filter((p) => p.status === 'in_development').length },
+            { value: 'ideas', label: 'Ideas', count: inQ.filter((p) => p.status === 'ideas').length },
+            { value: 'completed', label: 'Completed', count: inQ.filter((p) => p.status === 'completed').length },
+          ]}
+        />
       </div>
 
-      {/* Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="modal-overlay fixed inset-0" onClick={closeModal}></div>
-            <div className="modal-content inline-block align-bottom text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full">
-              <form onSubmit={handleSubmit(onSubmit)}>
-                <div className="modal-header">
-                  <h3 className="text-xl font-bold">
-                    {editingProject ? '✨ Edit Project' : '💖 Add New Project'}
-                  </h3>
-                </div>
-                <div className="modal-body">
-                  <div className="space-y-5">
-                    <div className="form-group">
-                      <label className="form-label">💖 Project Title</label>
-                      <input
-                        {...register('title', { required: 'Title is required', onChange: (e) => handleTitleChange(e.target.value) })}
-                        type="text"
-                        className="form-input"
-                        placeholder="My Amazing Project"
-                      />
-                      {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🔗 URL Slug</label>
-                      <input
-                        {...register('slug', {
-                          required: 'Slug is required',
-                          pattern: {
-                            value: /^[a-z0-9-]+$/,
-                            message: 'Slug can only contain lowercase letters, numbers, and hyphens'
-                          }
-                        })}
-                        type="text"
-                        className="form-input"
-                        placeholder="portfolio-website"
-                      />
-                      {errors.slug && <p className="text-red-500 text-sm mt-1">{errors.slug.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">📝 Description</label>
-                      <textarea
-                        {...register('description', { required: 'Description is required' })}
-                        rows={4}
-                        className="form-textarea"
-                        placeholder="Tell us about this beautiful project..."
-                      />
-                      {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description.message}</p>}
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🖼️ Project image URL</label>
-                      <p className="text-sm text-gray-500 mb-2">Card thumbnail on the portfolio site.</p>
-                      <input
-                        {...register('image')}
-                        type="url"
-                        className="form-input"
-                        placeholder="https://… or upload below"
-                      />
-                      <div className="mt-2">
-                        <ImageUploadButton
-                          label="Upload image"
-                          onUploaded={(url) => setValue('image', url)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">✨ Inspiration (optional)</label>
-                      <textarea
-                        {...register('inspiration')}
-                        rows={3}
-                        className="form-textarea"
-                        placeholder="What inspired this project? The problem you wanted to solve, the story behind it, etc."
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">📝 Project details (optional)</label>
-                      <p className="text-sm text-gray-500 mb-2">
-                        Markdown supported. This will show on the project details page.
-                      </p>
-                      <textarea
-                        {...register('content')}
-                        rows={10}
-                        className="form-textarea"
-                        placeholder="Add a deeper write-up: features, challenges, wins, learnings…"
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">🖼️ Gallery images (one URL per line)</label>
-                      <p className="text-sm text-gray-500 mb-2">Shown on the project details page.</p>
-                      <textarea
-                        {...register('images')}
-                        rows={5}
-                        className="form-textarea"
-                        placeholder={"https://…\nhttps://…"}
-                      />
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <ImageUploadButton
-                          label="Upload → add to gallery"
-                          onUploaded={(url) => {
-                            const cur = getValues('images') || ''
-                            setValue('images', cur ? `${cur}\n${url}` : url)
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">🛠️ Technologies (comma-separated)</label>
-                      <input
-                        {...register('technologies', { required: 'Technologies are required' })}
-                        type="text"
-                        placeholder="React, TypeScript, Node.js, PostgreSQL"
-                        className="form-input"
-                      />
-                      {errors.technologies && <p className="text-red-500 text-sm mt-1">{errors.technologies.message}</p>}
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">📌 Status</label>
-                      <select
-                        {...register('status')}
-                        className="form-input"
-                        defaultValue="in_development"
-                      >
-                        <option value="in_development">🚧 In Development</option>
-                        <option value="ideas">💡 Ideas</option>
-                        <option value="completed">✅ Completed</option>
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="form-group">
-                        <label className="form-label">🔗 GitHub URL</label>
-                        <input
-                          {...register('github_url')}
-                          type="url"
-                          className="form-input"
-                          placeholder="https://github.com/..."
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">🌐 Live URL</label>
-                        <input
-                          {...register('live_url')}
-                          type="url"
-                          className="form-input"
-                          placeholder="https://myproject.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">📅 Project Date</label>
-                      <input
-                        {...register('date', { required: 'Date is required' })}
-                        type="date"
-                        className="form-input"
-                      />
-                      {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date.message}</p>}
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <input
-                        {...register('featured')}
-                        type="checkbox"
-                        className="h-5 w-5 text-pink-600 focus:ring-pink-500 border-pink-300 rounded"
-                        id="featured"
-                      />
-                      <label htmlFor="featured" className="text-sm font-medium text-gray-700">⭐ Featured project (show on homepage)</label>
+      <section className="card" aria-label="Project list">
+        <div className="lh" style={{ gridTemplateColumns: GRID }}>
+          <span>Project</span><span>Status</span><span className="hide-sm">Technologies</span><span>Home page</span><span className="sr">Actions</span>
+        </div>
+        {isLoading ? <SkeletonRows /> : (
+          <ul className="rows">
+            {shown.map((p) => {
+              const [label, cls] = STATUS[p.status || 'ideas']
+              return (
+                <li key={p.id} className="row" style={{ gridTemplateColumns: GRID }}>
+                  <div className="cell-id">
+                    <img className="thumb" src={p.image || '/logo.svg'} alt="" width={800} height={427} loading="lazy" style={p.image ? undefined : { objectFit: 'contain' }} />
+                    <div>
+                      <p className="r1">{p.title}</p>
+                      <p className="r2">/projects/{p.slug}{isPublic(p) ? '' : ' · not on the site'}</p>
                     </div>
                   </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending || updateMutation.isPending}
-                    className="btn-success"
-                  >
-                    {createMutation.isPending || updateMutation.isPending ? (
-                      <div className="flex items-center">
-                        <div className="spinner w-4 h-4 mr-2"></div>
-                        Saving...
-                      </div>
-                    ) : (
-                      editingProject ? '✨ Update Project' : '💖 Create Project'
-                    )}
-                  </button>
-                </div>
-              </form>
+                  <span className="hide-sm"><span className={`pill ${cls}`}><span className="dot" />{label}</span></span>
+                  <div className="chips hide-sm" style={{ flexWrap: 'nowrap', overflow: 'hidden' }}>
+                    {p.technologies.slice(0, 3).map((t) => <span key={t} className="chip">{t}</span>)}
+                    {p.technologies.length > 3 ? <span className="mute" style={{ fontSize: 12, alignSelf: 'center', whiteSpace: 'nowrap' }}>+{p.technologies.length - 3}</span> : null}
+                  </div>
+                  <span className="hide-sm" style={{ fontSize: 13, color: p.featured ? '#4c1d95' : '#615a6c' }}>{p.featured ? 'Featured' : '—'}</span>
+                  <button type="button" className="btn btn-text right" onClick={() => open(p)} disabled={opening === p.id} aria-label={`Edit ${p.title}`}>Edit</button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {!isLoading && shown.length === 0 ? (
+          <div style={{ padding: '0 24px 20px' }}>
+            <div className="empty-slot">
+              <span>{needle ? `No projects match “${q.trim()}”.` : all.length ? 'No projects with this status.' : 'No projects yet.'}</span>
+              <button type="button" className="btn btn-text" onClick={() => { setQ(''); setFilter('all') }}>Clear filters</button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        ) : null}
+      </section>
+
+      {editId !== null ? (
+        <Dialog
+          title={editId === 'new' ? 'New project' : `Edit ${d.title || 'project'}`}
+          sub={editId === 'new' ? 'Saved projects show on the Projects page straight away.' : 'Changes show on the site when you save.'}
+          size="wide"
+          onClose={close}
+          saving={save.isPending}
+          onSubmit={submit}
+          footer={
+            <>
+              {editId !== 'new' ? <button type="button" className="btn btn-neg first" onClick={() => setConfirming(true)}>Delete project</button> : null}
+              <button type="button" className="btn btn-line" onClick={close} disabled={save.isPending}>Cancel</button>
+              <SaveButton saving={save.isPending} label={editId === 'new' ? 'Create project' : 'Save changes'} />
+            </>
+          }
+        >
+          <div className="tabs" role="tablist" aria-label="Project" style={{ marginTop: -8, marginBottom: 20 }}>
+            <button type="button" role="tab" id="pj-tab-d" aria-selected={tab === 'details'} aria-controls="pj-panel" aria-label={detailErrCount ? `Details, ${detailErrCount} ${detailErrCount === 1 ? 'error' : 'errors'}` : 'Details'} onClick={() => setTab('details')}>
+              Details{detailErrCount ? <span className="n" style={{ color: '#b4235a', fontWeight: 600 }}>{detailErrCount}</span> : null}
+            </button>
+            <button type="button" role="tab" id="pj-tab-c" aria-selected={tab === 'case'} aria-controls="pj-panel" aria-label={caseErrCount ? `Case study, ${caseErrCount} ${caseErrCount === 1 ? 'error' : 'errors'}` : caseEmpty ? 'Case study, empty' : 'Case study'} onClick={() => setTab('case')}>
+              Case study
+              {caseErrCount ? <span className="n" style={{ color: '#b4235a', fontWeight: 600 }}>{caseErrCount}</span> : caseEmpty ? <span className="n">empty</span> : null}
+            </button>
+          </div>
+          <div id="pj-panel" role="tabpanel" aria-labelledby={tab === 'details' ? 'pj-tab-d' : 'pj-tab-c'}>
+            {tab === 'details' ? (
+              <div className="form">
+                <Field label="Title" error={detailErr('title')}>{(p) => <input {...p} value={d.title} onChange={(e) => set('title', e.target.value)} />}</Field>
+                <Field label="URL slug" error={detailErr('slug')} hint={`demitaylornimmo.com/projects/${d.slug}`}>{(p) => <input {...p} value={d.slug} onChange={(e) => set('slug', e.target.value)} />}</Field>
+                <Field label="Description" span2 error={detailErr('description')} hint="The line under the title on the Projects page.">{(p) => <textarea {...p} rows={3} value={d.description} onChange={(e) => set('description', e.target.value)} />}</Field>
+                <div className="field span2">
+                  <span id="pj-status-l">Status</span>
+                  <Segmented aria-labelledby="pj-status-l" style={{ alignSelf: 'flex-start' }} value={d.status} onChange={(v) => set('status', v)}
+                    options={[{ value: 'in_development', label: 'In development' }, { value: 'ideas', label: 'Idea' }, { value: 'completed', label: 'Completed' }]} />
+                </div>
+                <Field label="Card image" span2 error={detailErr('image')} hint="The thumbnail on the Projects page and in link previews.">
+                  {(p) => (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <img className="thumb" src={d.image || '/logo.svg'} alt="" width={800} height={427} style={{ width: 88, height: 60, objectFit: d.image ? 'cover' : 'contain' }} />
+                      <div className="joined" style={{ flex: 1, minWidth: 0 }}>
+                        <input {...p} placeholder="https://" value={d.image} onChange={(e) => set('image', e.target.value)} />
+                        <ImageUploadButton onUploaded={(url) => set('image', url)} />
+                      </div>
+                    </div>
+                  )}
+                </Field>
+                <Field label="Gallery images" span2 error={detailErr('gallery')} hint="Shown on the project's case study page, in this order.">{(p) => <textarea {...p} rows={2} placeholder="One image URL per line" value={d.gallery} onChange={(e) => set('gallery', e.target.value)} />}</Field>
+                <Field label="Inspiration" span2 error={detailErr('inspiration')} hint="Optional. The problem it solves, the story behind it.">{(p) => <textarea {...p} rows={3} value={d.inspiration} onChange={(e) => set('inspiration', e.target.value)} />}</Field>
+                <Field label="Technologies" span2 error={detailErr('techText')} hint="Separate with commas."
+                  after={<span className="chips" aria-hidden="true">{techList.map((t) => <span key={t} className="chip">{t}</span>)}</span>}>
+                  {(p) => <input {...p} value={d.techText} onChange={(e) => set('techText', e.target.value)} />}
+                </Field>
+                <Field label="Your role" error={detailErr('role')} hint="Shown in the case study header.">{(p) => <input {...p} maxLength={120} value={d.role} onChange={(e) => set('role', e.target.value)} />}</Field>
+                <Field label="Platform" error={detailErr('platform')} hint="Shown in the case study header.">{(p) => <input {...p} maxLength={120} value={d.platform} onChange={(e) => set('platform', e.target.value)} />}</Field>
+                <Field label="GitHub URL" error={detailErr('github')}>{(p) => <input {...p} type="url" placeholder="https://github.com/" value={d.github} onChange={(e) => set('github', e.target.value)} />}</Field>
+                <Field label="Live URL" error={detailErr('live')}>{(p) => <input {...p} type="url" placeholder="https://" value={d.live} onChange={(e) => set('live', e.target.value)} />}</Field>
+                <Field label="Project date" error={detailErr('date')}>{(p) => <input {...p} type="date" value={d.date} onChange={(e) => set('date', e.target.value)} />}</Field>
+                <span />
+                <div className="field" style={{ justifyContent: 'flex-end' }}>
+                  <Switch checked={d.showOnSite} onChange={(v) => set('showOnSite', v)}>
+                    <span>
+                      <span style={{ display: 'block', fontWeight: 500 }}>Show on site</span>
+                      <span className="hint">{d.status === 'ideas' ? 'Ideas never show on the site, even with this on.' : 'Lists it on the Projects page, the home page and the CV.'}</span>
+                    </span>
+                  </Switch>
+                </div>
+                <div className="field" style={{ justifyContent: 'flex-end' }}>
+                  <Switch checked={d.featured} onChange={(v) => set('featured', v)}>
+                    <span>
+                      <span style={{ display: 'block', fontWeight: 500 }}>Feature on the home page</span>
+                      <span className="hint">{otherFeatured ? `Replaces ${otherFeatured.title} in the home page spotlight.` : 'The spotlight project on the home page.'}</span>
+                    </span>
+                  </Switch>
+                </div>
+              </div>
+            ) : (
+              <CaseStudyEditor value={cs} onChange={setCase} errors={caseErrors} legacy={legacy ? { content: d.content, onChange: (v) => set('content', v) } : null} />
+            )}
+          </div>
+        </Dialog>
+      ) : null}
+
+      {confirming && typeof editId === 'number' ? (
+        <ConfirmDialog
+          title={`Delete ${d.title}?`}
+          description="It disappears from the Projects page, the home page and the CV. This can't be undone."
+          confirmLabel="Delete project"
+          busy={remove.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => remove.mutate(editId)}
+        />
+      ) : null}
+    </>
   )
 }
-
-export default Projects

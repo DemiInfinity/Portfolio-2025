@@ -1,126 +1,46 @@
 'use client'
 
-import { Mail, Heart, Download } from 'lucide-react'
-import { GithubIcon, LinkedinIcon } from './BrandIcons'
-import { useFeatureFlag } from '@/lib/useFeatureFlag'
-import { useResumeAvailability } from '@/lib/useResumeAvailability'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { contact } from '@/lib/content/site'
 
-const Footer = () => {
-  const currentYear = new Date().getFullYear()
-  const { enabled: openToWork } = useFeatureFlag('open_to_work')
-  const { available: resumeAvailable, url: resumeUrl } = useResumeAvailability()
+const LINKS = [
+  { label: 'Home', href: '/' },
+  { label: 'Projects', href: '/projects' },
+  { label: 'Experience', href: '/experience' },
+  { label: 'About', href: '/about' },
+  { label: 'Learning', href: '/learning' },
+  { label: 'Blog', href: '/blog' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Terms', href: '/terms' },
+  { label: 'GitHub', href: contact.github },
+  { label: 'LinkedIn', href: contact.linkedin },
+] as const
+
+/** Footer from Main: logo, links (minus the current page), copyright. */
+export default function Footer() {
+  const pathname = usePathname() || '/'
+  const year = new Date().getFullYear()
+  const links = LINKS.filter((link) => link.href !== pathname)
 
   return (
-    <footer className="footer-girly">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <img
-              src="/brand-logo.png"
-              alt=""
-              className="h-11 w-auto max-w-[180px] object-contain object-left opacity-90"
-            />
-            <p className="text-gray-700 text-sm font-medium">
-              Full Stack Software Engineer passionate about creating beautiful, innovative solutions
-              and building exceptional user experiences. 💖
-            </p>
-            {openToWork && (
-              <div className="flex items-center gap-2 text-sm font-semibold text-pink-600">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Open to full-stack roles and freelance work</span>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Links */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              💫 Quick Links
-            </h3>
-            <div className="space-y-2">
-              <a href="/projects" className="block text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                Projects ✨
-              </a>
-              <a href="/learning" className="block text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                Learning 📚
-              </a>
-              <a href="/experience" className="block text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                Experience 💼
-              </a>
-              <a href="/blog" className="block text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                Blog 📝
-              </a>
-            </div>
-          </div>
-
-          {/* Connect */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800" style={{ fontFamily: 'Poppins, sans-serif' }}>
-              💌 Connect
-            </h3>
-            <div className="flex space-x-4">
-              <a
-                href="https://github.com/DemiInfinity"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 text-white hover:scale-110 transition-transform"
-              >
-                <GithubIcon className="w-5 h-5" />
-              </a>
-              <a
-                href="https://www.linkedin.com/in/demi-taylor-nimmo-bb320b40"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 text-white hover:scale-110 transition-transform"
-              >
-                <LinkedinIcon className="w-5 h-5" />
-              </a>
-              <a
-                href="mailto:demi.21@outlook.com"
-                className="p-2 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 text-white hover:scale-110 transition-transform"
-              >
-                <Mail className="w-5 h-5" />
-              </a>
-            </div>
-            {resumeAvailable && resumeUrl && (
-              <a
-                href={resumeUrl}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary text-sm px-4 py-2"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download CV
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-8 pt-8 border-t border-pink-200">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-5">
-              <p className="text-gray-600 text-sm font-medium">
-                © {currentYear} Demi Taylor Nimmo. All rights reserved. ✨
-              </p>
-              <nav aria-label="Legal" className="flex items-center gap-4">
-                <a href="/privacy" className="text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                  Privacy Policy
-                </a>
-                <a href="/terms" className="text-gray-600 hover:text-pink-600 text-sm transition-colors font-medium">
-                  Terms of Use
-                </a>
-              </nav>
-            </div>
-            <p className="text-gray-600 text-sm flex items-center font-medium">
-              Built with <Heart className="w-4 h-4 mx-1 text-pink-500" /> using Next.js & TypeScript 💖
-            </p>
-          </div>
-        </div>
-      </div>
+    <footer className="wrap site-footer">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.svg" alt="Demi Taylor Nimmo logo" width={128} height={72} loading="lazy" />
+      <nav aria-label="Footer">
+        {links.map((link) =>
+          link.href.startsWith('http') ? (
+            <a key={link.href} href={link.href}>
+              {link.label}
+            </a>
+          ) : (
+            <Link key={link.href} href={link.href}>
+              {link.label}
+            </Link>
+          )
+        )}
+      </nav>
+      <span>© {year} Demi Taylor Nimmo</span>
     </footer>
   )
 }
-
-export default Footer

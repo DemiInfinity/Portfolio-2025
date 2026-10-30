@@ -1,47 +1,10 @@
 import type { Metadata } from 'next'
-import { fetchWorkHistory, fetchEducation, fetchCertifications } from '@/lib/api'
+import { fetchEducation, fetchWorkHistory } from '@/lib/api'
 import ExperienceClient from './experience-client'
-
-interface WorkExperience {
-  id: number
-  company: string
-  position: string
-  location: string
-  start_date: string
-  end_date: string | null
-  description: string
-  achievements: string[]
-  technologies: string[]
-  company_url?: string
-}
-
-interface Education {
-  id: number
-  institution: string
-  degree: string
-  field_of_study?: string
-  location: string
-  start_date: string
-  end_date: string | null
-  grade?: string
-  description: string
-  achievements: string[]
-}
-
-interface Certification {
-  id: number
-  name: string
-  issuer: string
-  issue_date: string
-  expiry_date: string | null
-  credential_id?: string
-  credential_url?: string
-  description: string
-  skills: string[]
-}
 
 export const metadata: Metadata = {
   title: 'Experience',
+  description: 'Five years of full-stack work, from legacy .NET to micro-frontends, serverless and component libraries.',
 }
 
 // The backend cold-starts when idle, so this page must render per-request
@@ -49,18 +12,15 @@ export const metadata: Metadata = {
 // hiccup would fail the whole deploy instead of showing error.tsx.
 export const dynamic = 'force-dynamic'
 
-export default async function WorkHistory() {
-  const [workExperience, education, certifications] = await Promise.all([
-    fetchWorkHistory(),
-    fetchEducation(),
-    fetchCertifications(),
-  ])
+/** Current role first, then newest start date first. */
+function byNewest<T extends { start_date: string; end_date?: string | null }>(a: T, b: T) {
+  const aCurrent = a.end_date ? 0 : 1
+  const bCurrent = b.end_date ? 0 : 1
+  if (aCurrent !== bCurrent) return bCurrent - aCurrent
+  return String(b.start_date).localeCompare(String(a.start_date))
+}
 
-  return (
-    <ExperienceClient
-      workExperience={workExperience as WorkExperience[]}
-      education={education as Education[]}
-      certifications={certifications as Certification[]}
-    />
-  )
+export default async function Experience() {
+  const [roles, education] = await Promise.all([fetchWorkHistory(), fetchEducation()])
+  return <ExperienceClient roles={[...roles].sort(byNewest)} education={education} />
 }

@@ -9,19 +9,7 @@ import { initializeServices } from './services'
 import { errorHandler } from './middleware/errorHandler'
 import { notFound } from './middleware/notFound'
 
-// Routes
-import projectsRouter from './routes/projects'
-import blogRouter from './routes/blog'
-import learningRouter from './routes/learning'
-import workHistoryRouter from './routes/workHistory'
-import authRouter from './routes/supabase-auth'
-import skillsRouter from './routes/skills'
-import educationRoutes from './routes/education'
-import certificationsRoutes from './routes/certifications'
-import analyticsRoutes from './routes/analytics'
-import featureFlagsRoutes from './routes/featureFlags'
-import keepAliveRoutes from './routes/keepalive'
-import uploadRoutes from './routes/upload'
+import { mountApiRoutes } from './routes/mount'
 
 // Load environment variables
 const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development'
@@ -146,19 +134,8 @@ app.use(async (req, res, next) => {
   }
 })
 
-// API Routes
-app.use('/api/auth', authRouter)
-app.use('/api/projects', projectsRouter)
-app.use('/api/learning', learningRouter)
-app.use('/api/work-history', workHistoryRouter)
-app.use('/api/blog', blogRouter)
-app.use('/api/skills', skillsRouter)
-app.use('/api/education', educationRoutes)
-app.use('/api/certifications', certificationsRoutes)
-app.use('/api/analytics', analyticsRoutes)
-app.use('/api/feature-flags', featureFlagsRoutes)
-app.use('/api/keepalive', keepAliveRoutes)
-app.use('/api/upload', uploadRoutes)
+// API Routes (one list for both entry points: src/routes/mount.ts)
+mountApiRoutes(app)
 
 // Error handling
 app.use(notFound)

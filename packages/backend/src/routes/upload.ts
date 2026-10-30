@@ -5,6 +5,8 @@ import crypto from 'crypto'
 import { Request, Response, NextFunction } from 'express'
 import { authenticate, authorize, AuthRequest } from '../middleware/auth'
 import { getServices } from '../services'
+import { getBuildRow, kickIfOverdue, publicPdfUrl } from '../services/cvBuild'
+import { CV_FILE_NAME } from '../services/cvPdf'
 
 const router = express.Router()
 
@@ -200,6 +202,10 @@ const resumeUpload = multer({
   }
 })
 
+const RESUME_FALLBACK_NAME = 'Demi-Taylor-Nimmo-CV.pdf'
+
+// DEPRECATED (H-21): the CV PDF is generated automatically; an uploaded file is
+// no longer served by GET /upload/resume. Kept for one release.
 // Upload/replace the resume/CV PDF (admin only)
 router.post('/resume', authenticate, authorize('admin'), (req: Request, res: Response, next: NextFunction) => {
   const uploadMiddleware = resumeUpload.single('resume')
@@ -226,7 +232,8 @@ router.post('/resume', authenticate, authorize('admin'), (req: Request, res: Res
       const { error } = await client.storage.from(BUCKET).upload(RESUME_STORAGE_PATH, file.buffer, {
         contentType: 'application/pdf',
         upsert: true,
-        cacheControl: '3600'
+        cacheControl: '3600',
+        metadata: { originalName: file.originalname }
       })
 
       if (error) {
@@ -246,7 +253,9 @@ router.post('/resume', authenticate, authorize('admin'), (req: Request, res: Res
           path: RESUME_STORAGE_PATH,
           bucket: BUCKET,
           originalName: file.originalname,
-          size: file.size
+          name: file.originalname || RESUME_FALLBACK_NAME,
+          size: file.size,
+          updatedAt: new Date().toISOString()
         }
       })
     } catch (error) {
@@ -260,43 +269,49 @@ router.post('/resume', authenticate, authorize('admin'), (req: Request, res: Res
   })
 })
 
-// Check resume availability (public) - the frontend uses this to decide
-// whether to show the Download CV button at all, and to get the real URL.
-// Existence of the uploaded file is the source of truth; there's no
-// separate flag to fall out of sync with what's actually been uploaded.
+// Download CV status (public, un-enveloped; H-15 shape). Since H-21 this
+// describes the generated CV PDF, not an uploaded file. Fails closed: any
+// problem reports `available:false` rather than 500ing the page.
 router.get('/resume', async (_req: Request, res: Response) => {
+  const unavailable = { success: true, available: false, url: null }
   try {
-    const { supabaseService } = getServices()
-    const client = supabaseService.getClient()
+    const row = await getBuildRow()
+    kickIfOverdue(row)
+    if (!row?.generated_at || !row.pdf_path) return res.json(unavailable)
 
-    const { data: objects, error } = await client.storage.from(BUCKET).list(STORAGE_PREFIX, {
-      search: 'resume.pdf'
-    })
-
-    if (error || !objects?.some((obj) => obj.name === 'resume.pdf')) {
-      return res.json({
-        success: true,
-        available: false,
-        url: null
-      })
-    }
-
-    const { data: urlData } = client.storage.from(BUCKET).getPublicUrl(RESUME_STORAGE_PATH)
+    const client = getServices().supabaseService.getClient()
+    const dir = row.pdf_path.split('/').slice(0, -1).join('/')
+    const file = row.pdf_path.split('/').pop() as string
+    const { data: objects, error } = await client.storage.from(BUCKET).list(dir, { search: file })
+    if (error || !objects?.some((o) => o.name === file)) return res.json(unavailable)
 
     return res.json({
       success: true,
       available: true,
-      url: urlData.publicUrl,
-      path: RESUME_STORAGE_PATH
+      url: publicPdfUrl(row),
+      path: row.pdf_path,
+      name: CV_FILE_NAME,
+      size: row.size_bytes ?? null,
+      updatedAt: new Date(row.generated_at).toISOString()
     })
   } catch (error) {
     console.error('Check resume availability error:', error)
-    // Fail closed on the button rather than 500ing the page over this.
-    return res.json({
-      success: true,
-      available: false,
-      url: null
-    })
+    return res.json(unavailable)
+  }
+})
+
+// DEPRECATED (H-21): removes the manually uploaded resume. 200 even if absent.
+router.delete('/resume', authenticate, authorize('admin'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const { error } = await getServices().supabaseService.getClient().storage.from(BUCKET).remove([RESUME_STORAGE_PATH])
+    if (error) {
+      console.error('Supabase resume delete error:', error.message)
+      return res.status(500).json({ success: false, error: error.message || 'Failed to remove CV' })
+    }
+    return res.json({ success: true, message: 'CV removed' })
+  } catch (error) {
+    console.error('Delete resume error:', error)
+    return res.status(500).json({ success: false, error: 'Failed to remove CV' })
   }
 })
 

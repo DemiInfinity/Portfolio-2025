@@ -1,14 +1,8 @@
-import { Loader2 } from 'lucide-react'
-
-const LoadingSpinner = () => {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto mb-4" />
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    </div>
-  )
-}
+const LoadingSpinner = () => (
+  <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }} role="status">
+    <span className="spin" aria-hidden="true" style={{ borderColor: '#d9cfe6', borderTopColor: '#5b21b6' }} />
+    <span className="mute">Loading</span>
+  </div>
+)
 
 export default LoadingSpinner

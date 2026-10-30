@@ -1,15 +1,15 @@
 import type { Metadata } from 'next'
-import { Poppins } from 'next/font/google'
+import { Dancing_Script, JetBrains_Mono, Playfair_Display, Poppins, Source_Serif_4 } from 'next/font/google'
 import './globals.css'
-import Navigation from '@/components/Navigation'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
-import Footer from '@/components/Footer'
 import MaintenanceWrapper from '@/components/MaintenanceWrapper'
+import SiteChrome from '@/components/SiteChrome'
 
-const poppins = Poppins({ 
-  subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900']
-})
+const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-poppins', display: 'swap' })
+const playfair = Playfair_Display({ subsets: ['latin'], weight: ['700', '800'], variable: '--font-playfair', display: 'swap' })
+const dancing = Dancing_Script({ subsets: ['latin'], weight: ['700'], variable: '--font-dancing', display: 'swap' })
+const sourceSerif = Source_Serif_4({ subsets: ['latin'], weight: ['400', '600'], variable: '--font-source-serif', display: 'swap' })
+const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains', display: 'swap' })
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://demitaylornimmo.com'),
@@ -17,39 +17,35 @@ export const metadata: Metadata = {
     default: 'Home | Demi Taylor Nimmo',
     template: '%s | Demi Taylor Nimmo',
   },
-  description: 'Beautiful portfolio of Demi Taylor Nimmo, showcasing creative projects, skills, and professional experience in software engineering.',
+  description:
+    'Portfolio of Demi Taylor Nimmo, full-stack software engineer: projects, writing and professional experience.',
   keywords: 'software engineer, full stack developer, web development, portfolio, creative developer',
   authors: [{ name: 'Demi Taylor Nimmo' }],
   icons: {
     icon: [
-      { url: '/favicon.ico' },
-      { url: '/brand-logo.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
     shortcut: '/favicon.ico',
-    apple: { url: '/brand-logo.png', type: 'image/png' },
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
   },
+  manifest: '/site.webmanifest',
   openGraph: {
     title: 'Home | Demi Taylor Nimmo',
-    description: 'Beautiful portfolio showcasing creative projects, skills, and professional experience.',
+    description: 'Projects, writing and professional experience from full-stack software engineer Demi Taylor Nimmo.',
     type: 'website',
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${poppins.className} min-h-screen`}>
+    <html lang="en" className={`${poppins.variable} ${playfair.variable} ${dancing.variable} ${jetbrains.variable} ${sourceSerif.variable}`}>
+      <body>
         <MaintenanceWrapper>
           <AnalyticsProvider>
-            <Navigation />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
+            <SiteChrome>{children}</SiteChrome>
           </AnalyticsProvider>
         </MaintenanceWrapper>
       </body>
